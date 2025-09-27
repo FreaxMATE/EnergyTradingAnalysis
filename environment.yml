@@ -1,0 +1,13 @@
+# Conda environment file for cross-platform compatibility
+name: energy-trading-analysis
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python>=3.8
+  - numpy>=1.21.0
+  - pandas>=1.3.0
+  - matplotlib>=3.4.0
+  - pip
+  - pip:
+    - -e .

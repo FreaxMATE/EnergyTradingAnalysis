@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  energy-analysis:
+    build: .
+    container_name: energy-trading-analysis
+    volumes:
+      - ./output:/app/output
+      - .:/app
+    environment:
+      - PYTHONPATH=/app
+      - MPLBACKEND=Agg
+    working_dir: /app
+    command: python modelling.py
