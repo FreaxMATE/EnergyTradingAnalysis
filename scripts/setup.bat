@@ -35,7 +35,7 @@ echo 🎉 Setup complete!
 echo.
 echo To run the analysis:
 echo 1. Activate the virtual environment: venv\Scripts\activate.bat
-echo 2. Run the analysis: python modelling.py
+echo 2. Run the analysis: cd src ^&^& python modelling.py
 echo.
 echo To deactivate the virtual environment: deactivate
 pause

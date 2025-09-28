@@ -10,9 +10,10 @@ import matplotlib.dates as mdates
 # Time Zone: CET
 # Data Format: Half-hourly (HALF)
 
-data_df_2023 = pd.read_csv("price_dk_2023.csv", sep=',')
-data_df_2024 = pd.read_csv("price_dk_2024.csv", sep=',')
-data_df_2025 = pd.read_csv("price_dk_2025.csv", sep=',')
+# Use relative paths from src/ directory
+data_df_2023 = pd.read_csv("../data/price_dk_2023.csv", sep=',')
+data_df_2024 = pd.read_csv("../data/price_dk_2024.csv", sep=',')
+data_df_2025 = pd.read_csv("../data/price_dk_2025.csv", sep=',')
 
 # Date format: 01/01/2025 00:00:00 - 01/01/2025 01:00:00
 # This should be like 01/01/2025 00:00:00
@@ -95,7 +96,7 @@ plt.yticks(fontsize=ticksize)
 plt.xlabel('Time', fontsize=size)
 plt.ylabel(r'Day Ahead Price / €', fontsize=size)
 plt.tight_layout()
-plt.savefig('dayaheadprices.png', dpi=150)
+plt.savefig('../output/dayaheadprices.png', dpi=150)
 
 # Plot total_price vs n_parts
 fig2, ax2 = plt.subplots(figsize=figsize)
@@ -109,5 +110,5 @@ ax2.set_title('Total Cost vs Number of Procurements', fontsize=size)
 ax2.grid(True)
 #ax2.set_xticks(n_parts_list)
 plt.tight_layout()
-plt.savefig('total_cost_vs_nproc.png', dpi=150)
+plt.savefig('../output/total_cost_vs_nproc.png', dpi=150)
 plt.show()

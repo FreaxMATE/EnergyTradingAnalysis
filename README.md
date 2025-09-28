@@ -27,15 +27,15 @@ This project implements and visualizes different energy procurement strategies b
 **Linux/macOS:**
 ```bash
 git clone <repository-url>
-cd modelling
-./setup.sh
+cd EnergyTradingAnalysis
+./scripts/setup.sh
 ```
 
 **Windows:**
 ```cmd
 git clone <repository-url>
-cd modelling
-setup.bat
+cd EnergyTradingAnalysis
+scripts\setup.bat
 ```
 
 #### Option 2: Manual Setup
@@ -81,8 +81,8 @@ docker-compose up --build
 
 **After setup:**
 ```bash
-# Ensure virtual environment is activated (if using venv/conda)
-python modelling.py
+# Run the analysis
+cd src && python modelling.py
 ```
 
 **Output:**
@@ -95,15 +95,22 @@ python modelling.py
 ## 📁 Project Structure
 
 ```
-├── modelling.py              # Main analysis script
-├── price_dk_2023.csv        # 2023 price data
-├── price_dk_2024.csv        # 2024 price data  
-├── price_dk_2025.csv        # 2025 price data
+├── src/                     # Source code
+│   └── modelling.py         # Main analysis script
+├── data/                    # Data files
+│   ├── price_dk_2023.csv    # 2023 price data
+│   ├── price_dk_2024.csv    # 2024 price data
+│   ├── price_dk_2025.csv    # 2025 price data
+│   └── spotprice_2024_2025.csv
+├── output/                  # Generated outputs
+│   ├── dayaheadprices.png   # Price trends visualization
+│   └── total_cost_vs_nproc.png # Cost analysis chart
+├── scripts/                 # Setup and utility scripts
+│   ├── setup.sh            # Linux/macOS setup script
+│   └── setup.bat           # Windows setup script
 ├── requirements.txt         # Python dependencies
+├── environment.yml          # Conda environment specification
 ├── pyproject.toml          # Modern Python project configuration
-├── environment.yml         # Conda environment specification
-├── setup.sh               # Linux/macOS setup script
-├── setup.bat              # Windows setup script
 ├── Dockerfile             # Docker container configuration
 ├── docker-compose.yml     # Docker Compose configuration
 ├── flake.nix              # Nix development environment

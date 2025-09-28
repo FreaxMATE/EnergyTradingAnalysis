@@ -79,7 +79,7 @@ else
     echo "   source venv/bin/activate"
 fi
 echo "2. Run the analysis:"
-echo "   python modelling.py"
+echo "   cd src && python modelling.py"
 echo ""
 echo "To deactivate the virtual environment:"
 echo "   deactivate"
