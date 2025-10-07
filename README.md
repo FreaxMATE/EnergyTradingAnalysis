@@ -1,336 +1,135 @@
-# Energy Trading Day-Ahead Price Analysis & Procurement Optimization
+# Energy Trading Day-Ahead Price Analysis
 
-A Python-based analysis tool for modeling energy procurement strategies using day-ahead electricity prices from the Danish market (DK2 - Eastern Denmark). This project analyzes optimal timing and frequency of energy purchases to minimize total costs.
+A Python-based tool for optimizing energy procurement strategies using Danish day-ahead electricity prices (DK2). Analyzes optimal timing and frequency of energy purchases to minimize total procurement costs.
 
-## 📊 Project Overview
-
-This project implements and visualizes different energy procurement strategies by analyzing historical day-ahead electricity prices from the ENTSO-E Transparency Platform. The main focus is on optimizing the number and timing of energy purchases throughout the year to minimize total procurement costs.
-
-### Key Features
+## 📊 Features
 
 - **Historical Price Analysis**: Processes 3 years of hourly electricity price data (2023-2025)
-- **Procurement Strategy Optimization**: Implements an adaptive procurement algorithm
-- **Cost Analysis**: Compares total costs across different procurement frequencies
-- **Data Visualization**: Generates comprehensive charts showing price trends and optimal purchase points
+- **Procurement Optimization**: Implements adaptive procurement algorithm with configurable parameters
+- **Cost Analysis**: Compares total costs across different procurement frequencies (1-24 times per year)
+- **Visualization**: Generates comprehensive charts showing price trends and optimal purchase points
 
 ## 🚀 Quick Start
 
 ### Prerequisites
+- Python 3.8+ (Windows, macOS, Linux)
+- Git (optional)
 
-- Python 3.8+ (any platform: Windows, macOS, Linux)
-- Git (optional, for cloning)
+### Installation
 
-### Installation Options
-
-#### Option 1: Automated Setup (Recommended)
-
-**Linux/macOS:**
+**Simple Setup:**
 ```bash
 git clone <repository-url>
 cd EnergyTradingAnalysis
-./scripts/setup.sh
+pip install -r requirements.txt
 ```
 
-**Windows:**
-```cmd
-git clone <repository-url>
-cd EnergyTradingAnalysis
-scripts\setup.bat
-```
-
-#### Option 2: Manual Setup
-
-1. **Clone or download** this repository
-2. **Create virtual environment:**
-   ```bash
-   python -m venv venv
-   ```
-3. **Activate virtual environment:**
-   - Linux/macOS: `source venv/bin/activate`
-   - Windows: `venv\Scripts\activate` (or `venv\Scripts\activate.bat`)
-4. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-#### Option 3: Using Conda
-
-```bash
-conda env create -f environment.yml
-conda activate energy-trading-analysis
-```
-
-#### Option 4: Using Nix (Linux/macOS)
-
-```bash
-nix develop  # or nix-shell if using legacy Nix
-```
-
-#### Option 5: Using Docker (All platforms)
-
-```bash
-# Build and run
-docker build -t energy-analysis .
-docker run -v $(pwd):/app energy-analysis
-
-# Or use Docker Compose
-docker-compose up --build
-```
+**Alternative Methods:**
+- **Automated**: Run `./scripts/setup.sh` (Linux/macOS) or `scripts\setup.bat` (Windows)
+- **Conda**: `conda env create -f environment.yml && conda activate energy-trading-analysis`
+- **Docker**: `docker-compose up --build`
+- **Nix**: `nix develop` (Linux/macOS)
 
 ### Running the Analysis
 
-**After setup:**
+Run the analysis scripts from the `src/` directory (they use relative paths to `../data` and `../output`):
+
 ```bash
-# Run the analysis
-cd src && python modelling.py
+cd src
+python scheduled_procurement.py    # scheduling analysis + day-ahead trend plot
+python day_prices.py               # hourly profile (price by hour) plot
 ```
 
-**Output:**
-- Load and process the price data from CSV files
-- Run procurement optimization for different strategies
-- Generate two visualization files:
-  - `dayaheadprices.png`: Price trends with optimal purchase points
-  - `total_cost_vs_nproc.png`: Cost comparison across procurement frequencies
+**Generated Output:**
+- `output/dayaheadprices.png`: Price trends with optimal purchase points (produced by `scheduled_procurement.py`)
+- `output/total_cost_vs_nproc.png`: Total cost vs number of procurements (produced by `scheduled_procurement.py`)
+- `output/price_by_hour.png`: Average price by hour with error bars (produced by `day_prices.py`)
 
 ## 📁 Project Structure
 
 ```
-├── src/                     # Source code
-│   └── modelling.py         # Main analysis script
-├── data/                    # Data files
-│   ├── price_dk_2023.csv    # 2023 price data
-│   ├── price_dk_2024.csv    # 2024 price data
-│   ├── price_dk_2025.csv    # 2025 price data
-│   └── spotprice_2024_2025.csv
-├── output/                  # Generated outputs
-│   ├── dayaheadprices.png   # Price trends visualization
-│   └── total_cost_vs_nproc.png # Cost analysis chart
-├── scripts/                 # Setup and utility scripts
-│   ├── setup.sh            # Linux/macOS setup script
-│   └── setup.bat           # Windows setup script
+├── src/                     # Analysis scripts
+│   ├── scheduled_procurement.py  # scheduling analysis + main price trend plot
+│   └── day_prices.py             # hourly price profile and plot
+├── data/                    # CSV price data files (2023-2025)
+├── output/                  # Generated visualizations (PNG files)
+├── scripts/                 # Setup scripts for different platforms
 ├── requirements.txt         # Python dependencies
-├── environment.yml          # Conda environment specification
-├── pyproject.toml          # Modern Python project configuration
-├── Dockerfile             # Docker container configuration
-├── docker-compose.yml     # Docker Compose configuration
-├── flake.nix              # Nix development environment
-├── flake.lock             # Nix lock file
-├── .gitignore             # Git ignore rules
-├── dayaheadprices.png     # Generated: Price analysis chart
-├── total_cost_vs_nproc.png # Generated: Cost optimization chart
-└── README.md              # This file
+└── environment.yml          # Conda environment
 ```
 
-## 📈 Data Source
+## 🔬 Algorithm Overview
 
-**Data Provider**: [ENTSO-E Transparency Platform](https://newtransparency.entsoe.eu/)
+**Data Source**: [ENTSO-E Transparency Platform](https://newtransparency.entsoe.eu/)
+- Market: DK2 (Denmark Eastern) day-ahead prices
+- Resolution: Hourly data, converted to daily averages
+- Period: 2023-2025
 
-**Market Details**:
-- **Market**: Day-ahead Prices (DAM)
-- **Bidding Zone**: DK2 (Denmark - Eastern)  
-- **Time Zone**: CET/CEST
-- **Resolution**: Hourly data
-- **Period**: 2023-2025
+**Procurement Strategy (`sched_proc` function):**
+1. **Time Partitioning**: Divides the year into `n_parts` equal segments
+2. **Reference Tracking**: Maintains reference price that updates to lower values
+3. **Purchase Trigger**: Buys energy when price exceeds `reference + limit` (default: €10/MWh)
+4. **Cost Calculation**: Computes total cost for specified energy volume (default: 1000 MWh)
 
-## 🔬 Algorithm Description
-
-### Procurement Strategy (`sched_proc` function)
-
-The core algorithm implements an adaptive procurement strategy:
-
-1. **Time Partitioning**: Divides the time period into `n_parts` equal segments
-2. **Reference Tracking**: Maintains a reference price that updates to lower values
-3. **Trigger Logic**: Purchases energy when price exceeds `reference + limit`
-4. **Cost Calculation**: Computes total cost for the specified energy volume (default: 1000 MWh)
-
-**Parameters**:
+**Parameters:**
 - `mwhs`: Total energy to procure (default: 1000 MWh)
 - `n_parts`: Number of procurement periods (tested: 1, 2, 3, 4, 6, 12, 24)
-- `limit`: Price increase threshold for triggering purchases (default: €10/MWh)
+- `limit`: Price increase threshold (default: €10/MWh)
 
-### Analysis Features
+## 📈 Key Results
 
-- **Daily Averaging**: Converts hourly data to daily averages using 24-hour moving window
-- **Multi-Strategy Comparison**: Tests procurement frequencies from 1 to 24 times per year
-- **Cost Optimization**: Identifies optimal procurement frequency to minimize total costs
+- **Optimal Frequency**: Usually 3-6 procurements per year minimize total costs
+- **Cost Savings**: Significant reduction compared to single annual purchase
+- **Seasonal Patterns**: Purchase timing typically aligns with seasonal price cycles
+- **Diminishing Returns**: Increased procurement frequency shows diminishing cost benefits
 
-## 📊 Generated Visualizations
+## 🛠️ Usage Examples
 
-### 1. Day-Ahead Price Analysis (`dayaheadprices.png`)
-- Time series of daily average electricity prices
-- Optimal purchase points for different procurement strategies
-- Color-coded markers showing purchase timing for each strategy
-
-### 2. Cost Optimization Chart (`total_cost_vs_nproc.png`)
-- Total procurement costs vs. number of procurement periods
-- Helps identify the optimal procurement frequency
-- Shows diminishing returns of increased procurement frequency
-
-## 🛠️ Cross-Platform Compatibility
-
-### Supported Platforms
-- ✅ **Linux** (Ubuntu, Debian, RHEL, etc.)
-- ✅ **macOS** (Intel & Apple Silicon)
-- ✅ **Windows** (10/11, WSL)
-
-### Development Environments
-
-**Virtual Environment (All platforms):**
-```bash
-python -m venv venv
-source venv/bin/activate  # Linux/macOS
-# or
-venv\Scripts\activate     # Windows
-```
-
-**Conda (All platforms):**
-```bash
-conda env create -f environment.yml
-conda activate energy-trading-analysis
-```
-
-**Nix (Linux/macOS):**
-```bash
-nix develop  # Modern Nix with flakes
-# or
-nix-shell    # Legacy Nix
-```
-
-**Docker (All platforms):**
-```bash
-# Build and run with Docker
-docker build -t energy-analysis .
-docker run -v $(pwd)/output:/app/output energy-analysis
-
-# Or use Docker Compose
-docker-compose up --build
-```
-
-### Platform-Specific Notes
-
-**Windows:**
-- Use Command Prompt, PowerShell, or Git Bash
-- WSL (Windows Subsystem for Linux) fully supported
-- Python from Microsoft Store or python.org both work
-
-**macOS:**
-- Works with system Python or Homebrew Python
-- Both Intel and Apple Silicon Macs supported
-- Xcode Command Line Tools may be required
-
-**Linux:**
-- Most distributions supported
-- Use system package manager for Python if needed
-- Virtual environments recommended for isolation
-
-## 📋 Usage Examples
-
-### Basic Analysis
+**Basic Analysis:**
 ```python
-# Run with default parameters (1000 MWh, 4 procurements, €10 limit)
 buy_indices, total_cost = sched_proc(price_avg)
 ```
 
-### Custom Parameters
+**Custom Parameters:**
 ```python
-# Custom energy volume and procurement frequency
 buy_indices, total_cost = sched_proc(
     price=price_avg, 
     mwhs=2000,      # 2000 MWh total
     n_parts=6,      # 6 procurements per year
-    limit=15        # €15/MWh price increase limit
+    limit=15        # €15/MWh threshold
 )
 ```
 
-## 📊 Sample Results
-
-The analysis typically shows:
-- **Optimal Procurement Frequency**: Usually 3-6 times per year
-- **Cost Savings**: Significant reduction compared to single annual purchase
-- **Seasonal Patterns**: Purchase timing often aligns with seasonal price cycles
-
 ## 🔧 Troubleshooting
 
-### Common Issues
-
-**Import Errors:**
-```bash
-# Ensure virtual environment is activated
-source venv/bin/activate  # Linux/macOS
-venv\Scripts\activate     # Windows
-
-# Reinstall dependencies
-pip install -r requirements.txt
-```
-
-**Python Version Issues:**
+**Common Issues:**
 - Ensure Python 3.8+ is installed
-- Use `python3` command if `python` points to Python 2.x
-
-**Permission Issues (Linux/macOS):**
-```bash
-chmod +x setup.sh
-```
-
-**Windows Path Issues:**
-- Use Git Bash for Unix-like commands
-- Or use the provided `.bat` script for native Windows
-
-### Platform-Specific Installation
-
-**Ubuntu/Debian:**
-```bash
-sudo apt update
-sudo apt install python3 python3-pip python3-venv
-```
-
-**macOS (with Homebrew):**
-```bash
-brew install python
-```
-
-**Windows:**
-- Download from [python.org](https://www.python.org/downloads/)
-- Or install via Microsoft Store
-- Or use Anaconda/Miniconda
-
-## 🤝 Contributing
-
-Contributions are welcome! Areas for improvement:
-- Additional procurement strategies
-- Risk analysis and volatility metrics  
-- Integration with other European bidding zones
-- Real-time data integration
-- Machine learning price prediction
-
-### Development Setup
-1. Fork the repository
-2. Run setup script for your platform
-3. Make changes and test across platforms
-4. Submit a pull request
+- Activate virtual environment before running
+- Use `python3` if `python` points to Python 2.x
+- On Linux/macOS: `chmod +x scripts/setup.sh` if permission denied
 
 ## 📄 License
 
-This project is provided as-is for educational and research purposes. Price data is sourced from ENTSO-E under their terms of use.
+Educational and research use. Price data from ENTSO-E under their terms of use.
 
-## 🚀 Deployment
+## 📸 Plots (output/)
 
-### Package Installation
-```bash
-pip install -e .  # Development installation
-# or
-pip install .     # Regular installation
-```
+The repository includes example generated visualizations in the `output/` directory. If you run the scripts above they will be (re)created.
 
-### Distribution
-```bash
-python -m build  # Create distribution packages
-```
+- dayaheadprices.png
 
-## 📞 Contact
+![Day-ahead prices with procurement points](output/dayaheadprices.png)
 
-For questions or suggestions regarding this energy trading analysis, please open an issue or submit a pull request.
+Caption: Daily-averaged day-ahead prices with procurement markers for different numbers of procurements (N_proc). Each marker shows the time and price where the algorithm decided to buy — useful to inspect timing and clustering of purchase points.
 
----
+- total_cost_vs_nproc.png
 
-*This project demonstrates quantitative analysis techniques for energy market optimization and serves as a foundation for more sophisticated trading algorithms.*
+![Total cost vs number of procurements](output/total_cost_vs_nproc.png)
+
+Caption: Total procurement cost (€) as a function of the number of procurements per year. Use this to identify the procurement frequency that minimizes total cost.
+
+- price_by_hour.png
+
+![Average price by hour](output/price_by_hour.png)
+
+Caption: Average day-ahead price by hour-of-day with error bars (standard deviation). Highlights intraday patterns and hours with highest/lowest average prices.
