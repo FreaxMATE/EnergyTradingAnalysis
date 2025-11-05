@@ -1,13 +1,14 @@
 from entsoe import EntsoePandasClient
 import pandas as pd
 import os
+import subprocess
 
 class DataManager():
-    def __init__(self) -> None:
+    def __init__(self, read_data=True) -> None:
         self.__directory = 'data'
         self.__country_codes_full = pd.read_csv('src/country_codes.csv', dtype=str, delimiter=',', comment='#')
         self.__country_codes = self.__country_codes_full['code']
-        self.__data = self.__read_data()
+        self.__data = None if read_data == False else self.__read_data()
 
     @property
     def data(self):
@@ -22,11 +23,24 @@ class DataManager():
 
     def download_by_country_code(self, client, country_code, start_date, end_date):
         day_ahead_prices = client.query_day_ahead_prices(country_code, start_date, end_date)
+        directory = self.__directory+'/'+country_code+'/'
+        filepath = directory+country_code+'.csv'
+        append = False
         try:
-            directory = self.__directory+'/'+country_code+'/'
+            if os.path.exists(filepath):
+                result = subprocess.run(['tail', '-n', '1', filepath], capture_output=True, text=True)
+                last_saved_time = pd.Timestamp(result.stdout.strip().split()[0])
+                start_date = last_saved_time
+                append = True
+        except Exception as e:
+            print(f"Exception: {e}")
+        try:
             if not os.path.exists(directory):
                 os.makedirs(directory)
-            day_ahead_prices.to_csv(directory+country_code+'.csv')
+            if append == False:
+                day_ahead_prices.to_csv(filepath)
+            else:
+                day_ahead_prices.to_csv(filepath, mode='a', header=False)
         except Exception as e:
             print(f"Exception: {e}")
         print('Finished download of ', country_code)
@@ -34,10 +48,10 @@ class DataManager():
     def download(self):
         client = EntsoePandasClient(api_key='682f38f9-67e8-4efb-b482-70f1945ab45e')
         start_date = pd.Timestamp('20250101', tz='Europe/Brussels')
-        end_date = pd.Timestamp('20250601', tz='Europe/Brussels')
+        end_date = pd.Timestamp.today(tz='Europe/Brussels')
         for i, country_code in enumerate(self.__country_codes):
             self.download_by_country_code(client, country_code, start_date, end_date)
 
 if __name__ == '__main__':
-    data_manager = DataManager()
+    data_manager = DataManager(read_data=False)
     data_manager.download()
