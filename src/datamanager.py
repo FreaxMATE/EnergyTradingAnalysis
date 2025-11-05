@@ -2,19 +2,6 @@ from entsoe import EntsoePandasClient
 import pandas as pd
 import os
 
-class Data():
-    def __init__(self, pandas_csv) -> None:
-        self.__data = pandas_csv
-
-    @property
-    def time(self):
-        return self.__data['time']
-
-    @property
-    def price(self):
-        return self.__data['price']
-
-
 class DataManager():
     def __init__(self) -> None:
         self.__directory = 'data'
@@ -31,7 +18,7 @@ class DataManager():
         return self.__country_codes
 
     def __read_data(self):
-        return {country_code: Data(pd.read_csv('data/'+country_code+'/'+country_code+'.csv', delimiter=',', names=['time', 'price'], skiprows=1, comment='#')) for country_code in self.__country_codes}
+        return {country_code: pd.DataFrame(pd.read_csv('data/'+country_code+'/'+country_code+'.csv', delimiter=',', names=['time', 'price'], skiprows=1, comment='#')) for country_code in self.__country_codes}
 
     def download_by_country_code(self, client, country_code, start_date, end_date):
         day_ahead_prices = client.query_day_ahead_prices(country_code, start_date, end_date)
@@ -41,8 +28,8 @@ class DataManager():
                 os.makedirs(directory)
             day_ahead_prices.to_csv(directory+country_code+'.csv')
         except Exception as e:
-            print(f"EXception: {e}")
-        print('Downloaded', country_code)
+            print(f"Exception: {e}")
+        print('Finished download of ', country_code)
 
     def download(self):
         client = EntsoePandasClient(api_key='682f38f9-67e8-4efb-b482-70f1945ab45e')

@@ -39,7 +39,7 @@
         python312Packages.matplotlib
         python312Packages.pandas
         python312Packages.plotly
-        # python312Packages.dash
+        python312Packages.dash
         entsoe-py
       ];
     };
