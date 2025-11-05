@@ -16,7 +16,8 @@ def update_graph(value):
 
 if __name__ == '__main__':
     dm = dmng.DataManager()
-    app = Dash()
+    app = Dash(__name__)
+    server = app.server
     app.layout = [
         html.H1(children='Energy Trading Analysis', style={'textAlign':'center'}),
         dcc.Dropdown(dm.country_codes.tolist(), 'DK_2', id='dropdown-selection'),
