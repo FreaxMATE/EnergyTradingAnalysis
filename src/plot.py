@@ -8,6 +8,11 @@ import datamanager as dmng
 
 dm = dmng.DataManager()
 app = Dash(__name__)
+app.layout = [
+    html.H1(children='Energy Trading Analysis', style={'textAlign':'center'}),
+    dcc.Dropdown(dm.country_codes.tolist(), 'DK_2', id='dropdown-selection'),
+    dcc.Graph(id='graph-content')
+]
 server = app.server
 
 @callback(
@@ -18,9 +23,4 @@ def update_graph(value):
     return px.line(dm.data[value], x='time', y='price')
 
 if __name__ == '__main__':
-    app.layout = [
-        html.H1(children='Energy Trading Analysis', style={'textAlign':'center'}),
-        dcc.Dropdown(dm.country_codes.tolist(), 'DK_2', id='dropdown-selection'),
-        dcc.Graph(id='graph-content')
-    ]
     app.run(debug=True)
