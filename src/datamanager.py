@@ -2,6 +2,7 @@ from entsoe import EntsoePandasClient
 import pandas as pd
 import os
 import subprocess
+import utils
 
 class DataManager():
     def __init__(self, read_data=True) -> None:
@@ -21,19 +22,26 @@ class DataManager():
     def __read_data(self):
         return {country_code: pd.DataFrame(pd.read_csv('data/'+country_code+'/'+country_code+'.csv', delimiter=',', names=['time', 'price'], skiprows=1, comment='#')) for country_code in self.__country_codes}
 
+
+
     def download_by_country_code(self, client, country_code, start_date, end_date):
-        day_ahead_prices = client.query_day_ahead_prices(country_code, start_date, end_date)
+        print('Start Downloading: ', country_code)
         directory = self.__directory+'/'+country_code+'/'
         filepath = directory+country_code+'.csv'
         append = False
         try:
             if os.path.exists(filepath):
-                result = subprocess.run(['tail', '-n', '1', filepath], capture_output=True, text=True)
-                last_saved_time = pd.Timestamp(result.stdout.strip().split()[0])
+                print('  Evaluating Existing File...', end='', flush=True)
+                last_line = utils.read_last_csv_line(filepath)
+                last_saved_time = pd.Timestamp(last_line.strip().split()[0], tz='Europe/Brussels')
                 start_date = last_saved_time
                 append = True
+                print('  ✓')
         except Exception as e:
             print(f"Exception: {e}")
+        print('  Start Fetching Data... ', end='', flush=True)
+        day_ahead_prices = client.query_day_ahead_prices(country_code, start_date, end_date)
+        print('  ✓')
         try:
             if not os.path.exists(directory):
                 os.makedirs(directory)
@@ -43,7 +51,7 @@ class DataManager():
                 day_ahead_prices.to_csv(filepath, mode='a', header=False)
         except Exception as e:
             print(f"Exception: {e}")
-        print('Finished download of ', country_code)
+        print('Finished Downloading: ', country_code)
 
     def download(self):
         client = EntsoePandasClient(api_key='682f38f9-67e8-4efb-b482-70f1945ab45e')

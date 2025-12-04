@@ -3,8 +3,9 @@ import numpy as np
 import plotly.express as px
 import plotly
 from dash import Dash, html, dcc, callback, Output, Input
-
 import datamanager as dmng
+
+plotly.io.templates.default = "plotly_white"
 
 dm = dmng.DataManager()
 app = Dash(__name__)
