@@ -6,6 +6,8 @@ import numpy as np
 import inspect
 import dataanalysis
 
+START_OF_15_MIN_SPOT_PRICE = pd.Timestamp('20251001', tz='Europe/Brussels')
+
 class DataManager():
     def __init__(self, read_mode: str = '') -> None:
         self.__directory = 'data'
@@ -76,8 +78,11 @@ class DataManager():
             if os.path.exists(filepath):
                 print('  Evaluating Existing File...', end='', flush=True)
                 last_line = utils.read_last_csv_line(filepath)
-                last_saved_time = pd.Timestamp(last_line.strip().split()[0], tz='Europe/Brussels')
-                start_date = last_saved_time
+                last_saved_time = pd.Timestamp(last_line.strip().split(',')[0], tz='Europe/Brussels')
+                if last_saved_time > START_OF_15_MIN_SPOT_PRICE:
+                    start_date = last_saved_time + pd.Timedelta(minutes=15)
+                else:
+                    start_date = last_saved_time + pd.Timedelta(hours=1)
                 append = True
                 print('  ✓')
         except Exception as e:
@@ -99,10 +104,10 @@ class DataManager():
     def download(self):
         client = EntsoePandasClient(api_key='682f38f9-67e8-4efb-b482-70f1945ab45e')
         start_date = pd.Timestamp('20250101', tz='Europe/Brussels')
-        end_date = pd.Timestamp.today(tz='Europe/Brussels')
+        end_date = pd.Timestamp.today(tz='Europe/Brussels').round(freq='h')
         for i, country_code in enumerate(self.__country_codes):
             self.download_by_country_code(client, country_code, start_date, end_date)
 
 if __name__ == '__main__':
-    data_manager = DataManager(read_data=False)
+    data_manager = DataManager()
     data_manager.download()
