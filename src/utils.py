@@ -1,4 +1,4 @@
-
+import pandas as pd
 
 def read_last_csv_line(filepath):
     """Read the last line of a CSV file efficiently."""
@@ -26,3 +26,13 @@ def read_last_csv_line(filepath):
                 return lines[-1].decode('utf-8')
         
         return lines[0].decode('utf-8') if lines else ''
+    
+def extract_last(data, timedelta):
+    # print(data)
+    # print(data['time'])
+    # print('LAST ELEMENT', data['time'].iloc[-1])
+    last_24h = pd.to_datetime(data['time'].iloc[-1], utc=True) - timedelta
+    data24h = data.copy()
+    data24h['time'] = pd.to_datetime(data24h['time'], utc=True)
+    data24h = data24h[data24h['time'] >= last_24h]
+    return data24h

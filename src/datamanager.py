@@ -1,19 +1,27 @@
 from entsoe import EntsoePandasClient
 import pandas as pd
 import os
-import subprocess
 import utils
+import numpy as np
+import inspect
+import dataanalysis
 
 class DataManager():
-    def __init__(self, read_data=True) -> None:
+    def __init__(self, read_mode: str = '') -> None:
         self.__directory = 'data'
         self.__country_codes_full = pd.read_csv('src/country_codes.csv', dtype=str, delimiter=',', comment='#')
         self.__country_codes = self.__country_codes_full['code']
-        self.__data = None if read_data == False else self.__read_data()
+        # {country_code: price_data([time, price])}
+        self.__data = self.__read_data() if read_mode == 'data' or read_mode == 'feature' else None
+        self.__features = self.__read_features() if read_mode == 'feature' else None 
 
     @property
     def data(self):
         return self.__data
+
+    @property
+    def features(self):
+        return self.__features
 
     @property
     def country_codes(self):
@@ -22,7 +30,42 @@ class DataManager():
     def __read_data(self):
         return {country_code: pd.DataFrame(pd.read_csv('data/'+country_code+'/'+country_code+'.csv', delimiter=',', names=['time', 'price'], skiprows=1, comment='#')) for country_code in self.__country_codes}
 
+    def __read_features(self):
+        directory = f"{self.__directory}/"
+        filename = f"features.csv"   
+        filepath = os.path.join(directory, filename)
+        features = pd.read_csv(filepath, header=0)
+        feature_names = features.columns.tolist()
+        return {country_code: {feature: pd.DataFrame(pd.read_csv('data/'+country_code+'/'+country_code+'_'+feature+'.csv', delimiter=',', comment='#')) for feature in feature_names} for country_code in self.__country_codes}
 
+    def analysis_by_country_code(self, country_code: str):
+        self.save_analysis(country_code=country_code, df=dataanalysis.ma(df=self.__data[country_code]), feature='ma')
+
+    def analysis(self):
+        for country_code in self.country_codes:
+            self.analysis_by_country_code(country_code=country_code)
+
+        directory = f"{self.__directory}/"
+        filename = f"features.csv"   
+        filepath = os.path.join(directory, filename)
+        with open(filepath, 'a') as f:
+            f.write('ma\n')
+
+
+    def save_analysis(self, country_code: str, df: pd.DataFrame, feature: str = 'ma'):
+        """
+        Save analysis DataFrame (e.g., moving average) to CSV in the country's data directory.
+        Args:
+            country_code (str): Country code (e.g., 'FR')
+            df (pd.DataFrame): DataFrame to save
+            feature (str): Analysis feature, also the suffix for the filename (default: 'ma')
+        """
+
+        directory = f"{self.__directory}/{country_code}/"
+        filename = f"{country_code}_{feature}.csv"
+        filepath = os.path.join(directory, filename)
+        df.to_csv(filepath, index=False)
+        print(f"Saved analysis to {filepath}")
 
     def download_by_country_code(self, client, country_code, start_date, end_date):
         print('Start Downloading: ', country_code)
