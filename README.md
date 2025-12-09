@@ -1,13 +1,20 @@
 # Energy Trading Day-Ahead Price Analysis
 
-A Python-based tool for optimizing energy procurement strategies using Danish day-ahead electricity prices (DK2). Analyzes optimal timing and frequency of energy purchases to minimize total procurement costs.
+A Python-based tool for exploring and optimizing energy procurement strategies using Danish day-ahead electricity prices (DK2). The centerpiece is an **interactive dashboard** for visualizing price trends, moving averages, and predictions for multiple countries.
+
+## 🖼️ Interactive Dashboard
+
+![Dashboard Screenshot](output/dash_screenshot.png)
+
+*Example: Dash web app showing price and moving average for selected country. Explore historical trends, zoom into the last 24 hours, and compare predictive features interactively.*
 
 ## 📊 Features
 
-- **Historical Price Analysis**: Processes 3 years of hourly electricity price data (2023-2025)
-- **Procurement Optimization**: Implements adaptive procurement algorithm with configurable parameters
-- **Cost Analysis**: Compares total costs across different procurement frequencies (1-24 times per year)
-- **Visualization**: Generates comprehensive charts showing price trends and optimal purchase points
+- **Interactive Dashboard**: Explore price and moving average trends for any country using a Dash web app (`src/plot.py`).
+- **Historical Price Analysis**: Processes 3 years of hourly electricity price data (2023-2025).
+- **Procurement Optimization**: Implements adaptive procurement algorithm with configurable parameters.
+- **Cost Analysis**: Compares total costs across different procurement frequencies (1-24 times per year).
+- **Visualization**: Generates comprehensive charts showing price trends and optimal purchase points.
 
 ## 🚀 Quick Start
 
@@ -30,17 +37,19 @@ pip install -r requirements.txt
 - **Docker**: `docker-compose up --build`
 - **Nix**: `nix develop` (Linux/macOS)
 
-### Running the Analysis
+### Running the Dashboard & Analysis
 
-Run the analysis scripts from the `src/` directory (they use relative paths to `../data` and `../output`):
+From the `src/` directory:
 
 ```bash
 cd src
+python main.py plot                # launch interactive dashboard
 python scheduled_procurement.py    # scheduling analysis + day-ahead trend plot
 python day_prices.py               # hourly profile (price by hour) plot
 ```
 
 **Generated Output:**
+- `output/dash_screenshot.png`: Dashboard screenshot (add manually)
 - `output/dayaheadprices.png`: Price trends with optimal purchase points (produced by `scheduled_procurement.py`)
 - `output/total_cost_vs_nproc.png`: Total cost vs number of procurements (produced by `scheduled_procurement.py`)
 - `output/price_by_hour.png`: Average price by hour with error bars (produced by `day_prices.py`)
@@ -48,14 +57,23 @@ python day_prices.py               # hourly profile (price by hour) plot
 ## 📁 Project Structure
 
 ```
-├── src/                     # Analysis scripts
-│   ├── scheduled_procurement.py  # scheduling analysis + main price trend plot
-│   └── day_prices.py             # hourly price profile and plot
+├── src/                     # Source code and analysis scripts
+│   ├── main.py                  # CLI entry point (download, analyze, plot)
+│   ├── plot.py                  # Dash dashboard for interactive exploration
+│   ├── datamanager.py           # Data loading and feature extraction
+│   ├── dataanalysis.py          # Analysis functions (moving average, prediction)
+│   ├── scheduled_procurement.py # Procurement optimization analysis
+│   ├── day_prices.py            # Hourly price profile and plot
+│   └── utils.py                 # Utility functions
 ├── data/                    # CSV price data files (2023-2025)
 ├── output/                  # Generated visualizations (PNG files)
 ├── scripts/                 # Setup scripts for different platforms
 ├── requirements.txt         # Python dependencies
-└── environment.yml          # Conda environment
+├── environment.yml          # Conda environment
+├── Dockerfile               # Docker support
+├── docker-compose.yml       # Docker orchestration
+├── flake.nix                # Nix environment
+└── README.md                # Project documentation
 ```
 
 ## 🔬 Algorithm Overview
