@@ -4,7 +4,7 @@ A Python-based tool for exploring and optimizing energy procurement strategies u
 
 ## 🖼️ Interactive Dashboard
 
-![Dashboard Screenshot](output/dash_screenshot.png)
+![Dashboard Screenshot](screenshot.png)
 
 *Example: Dash web app showing price and moving average for selected country. Explore historical trends, zoom into the last 24 hours, and compare predictive features interactively.*
 
