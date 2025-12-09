@@ -6,8 +6,6 @@ import numpy as np
 import inspect
 import dataanalysis
 
-START_OF_15_MIN_SPOT_PRICE = pd.Timestamp('20251001', tz='Europe/Brussels')
-
 class DataManager():
     def __init__(self, read_mode: str = '') -> None:
         self.__directory = 'data'
