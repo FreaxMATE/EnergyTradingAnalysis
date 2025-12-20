@@ -13,6 +13,28 @@ services:
       - PYTHONUNBUFFERED=1
     command: ["python", "src/main.py", "plot"]
 
+  scheduler:
+    build: .
+    container_name: energy-trading-scheduler
+    volumes:
+      - ./data:/app/data
+    environment:
+      - ENTSOE_API_KEY=${ENTSOE_API_KEY}
+    entrypoint: /bin/sh
+    command: 
+      - -c
+      - |
+        echo "Starting scheduler - will download data every hour"
+        while true; do
+          echo "$(date): Downloading latest energy price data..."
+          python src/main.py download
+          echo "$(date): Download complete. Sleeping for 1 hour..."
+          sleep 3600
+        done
+    restart: unless-stopped
+    profiles:
+      - scheduler
+
   download:
     build: .
     container_name: energy-trading-download

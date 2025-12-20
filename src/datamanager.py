@@ -5,6 +5,10 @@ import utils
 import numpy as np
 import inspect
 import dataanalysis
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 class DataManager():
     def __init__(self, read_mode: str = '') -> None:
@@ -100,7 +104,10 @@ class DataManager():
         print('Finished Downloading: ', country_code)
 
     def download(self):
-        client = EntsoePandasClient(api_key='682f38f9-67e8-4efb-b482-70f1945ab45e')
+        api_key = os.getenv('ENTSOE_API_KEY')
+        if not api_key:
+            raise ValueError("ENTSOE_API_KEY not found in environment variables. Please set it in .env file")
+        client = EntsoePandasClient(api_key=api_key)
         start_date = pd.Timestamp('20250101', tz='Europe/Brussels')
         end_date = pd.Timestamp.today(tz='Europe/Brussels').round(freq='h')
         for i, country_code in enumerate(self.__country_codes):

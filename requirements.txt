@@ -5,3 +5,4 @@ entsoe-py==0.7.8
 dash>=2.14.0
 plotly>=5.17.0
 gunicorn>=21.2.0
+python-dotenv>=1.0.0
