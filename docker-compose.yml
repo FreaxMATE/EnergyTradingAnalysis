@@ -1,14 +1,54 @@
 version: '3.8'
 
 services:
-  energy-analysis:
+  dashboard:
     build: .
-    container_name: energy-trading-analysis
+    container_name: energy-trading-dashboard
+    ports:
+      - "8050:8050"
     volumes:
+      - ./data:/app/data
       - ./output:/app/output
-      - .:/app
     environment:
-      - PYTHONPATH=/app
-      - MPLBACKEND=Agg
-    working_dir: /app
-    command: python modelling.py
+      - PYTHONUNBUFFERED=1
+    command: ["python", "src/main.py", "plot"]
+
+  download:
+    build: .
+    container_name: energy-trading-download
+    volumes:
+      - ./data:/app/data
+    command: ["python", "src/main.py", "download"]
+    profiles:
+      - download
+
+  analyze:
+    build: .
+    container_name: energy-trading-analyze
+    volumes:
+      - ./data:/app/data
+    command: ["python", "src/main.py", "analyze"]
+    profiles:
+      - analyze
+
+  legacy-scheduled:
+    build: .
+    container_name: energy-trading-scheduled
+    volumes:
+      - ./data:/app/data
+      - ./output:/app/output
+    working_dir: /app/src
+    command: ["python", "legacy/scheduled_procurement.py"]
+    profiles:
+      - legacy
+
+  legacy-dayprices:
+    build: .
+    container_name: energy-trading-dayprices
+    volumes:
+      - ./data:/app/data
+      - ./output:/app/output
+    working_dir: /app/src
+    command: ["python", "legacy/day_prices.py"]
+    profiles:
+      - legacy

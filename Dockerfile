@@ -22,11 +22,12 @@ COPY . .
 RUN mkdir -p /app/output
 
 # Set environment variables
-ENV PYTHONPATH=/app
+ENV PYTHONPATH=/app/src
 ENV MPLBACKEND=Agg
 
-# Command to run the analysis
-CMD ["python", "modelling.py"]
+# Expose port for Dash dashboard
+EXPOSE 8050
 
-# Optional: Expose a port if you want to serve results
-# EXPOSE 8080
+# Default command runs the interactive dashboard
+# Override with docker run arguments for other modes
+CMD ["python", "src/main.py", "plot"]
