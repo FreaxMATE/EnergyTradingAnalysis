@@ -6,6 +6,7 @@ import numpy as np
 import inspect
 import dataanalysis
 from dotenv import load_dotenv
+from config import START_OF_15_MIN_SPOT_PRICE
 
 # Load environment variables from .env file
 load_dotenv()

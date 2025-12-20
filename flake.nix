@@ -41,6 +41,7 @@
         python312Packages.plotly
         python312Packages.dash
         python312Packages.gunicorn
+        python312Packages.python-dotenv
         entsoe-py
       ];
     };
