@@ -6,7 +6,9 @@ import numpy as np
 import inspect
 import dataanalysis
 from dotenv import load_dotenv
-import config
+
+# Directly import variables from config
+from config import DEBUG, START_OF_15_MIN_SPOT_PRICE
 
 # Load environment variables from .env file
 load_dotenv()
@@ -82,7 +84,7 @@ class DataManager():
                 print('  Evaluating Existing File...', end='', flush=True)
                 last_line = utils.read_last_csv_line(filepath)
                 last_saved_time = pd.Timestamp(last_line.strip().split(',')[0], tz='Europe/Brussels')
-                if last_saved_time > config.START_OF_15_MIN_SPOT_PRICE:
+                if last_saved_time > START_OF_15_MIN_SPOT_PRICE:
                     start_date = last_saved_time + pd.Timedelta(minutes=15)
                 else:
                     start_date = last_saved_time + pd.Timedelta(hours=1)
