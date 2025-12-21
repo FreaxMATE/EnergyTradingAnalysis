@@ -26,6 +26,7 @@ jobs:
       - name: Download latest data
         env:
           ENTSOE_API_KEY: ${{ secrets.ENTSOE_API_KEY }}
+          PYTHONPATH: ${{ github.workspace }}/src
         run: |
           python src/main.py download
           
