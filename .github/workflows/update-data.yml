@@ -1,4 +1,6 @@
 name: Update Energy Price Data
+permissions:
+  contents: write
 
 on:
   schedule:
@@ -13,6 +15,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+          fetch-depth: 0
         
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -21,16 +26,19 @@ jobs:
           
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
           
       - name: Download latest data
         env:
           ENTSOE_API_KEY: ${{ secrets.ENTSOE_API_KEY }}
-          PYTHONPATH: ${{ github.workspace }}/src
         run: |
           python src/main.py download
           
       - name: Commit and push if changed
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
