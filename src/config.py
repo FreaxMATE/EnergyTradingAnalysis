@@ -43,7 +43,7 @@ if not ENTSOE_API_KEY:
 # ============================================================================
 DEFAULT_TIMEZONE = 'Europe/Brussels'
 START_OF_15_MIN_SPOT_PRICE = pd.Timestamp('20251001', tz=DEFAULT_TIMEZONE)
-DATA_START_DATE = pd.Timestamp('20250101', tz=DEFAULT_TIMEZONE)
+DATA_START_DATE = pd.Timestamp('20210101', tz=DEFAULT_TIMEZONE)
 COUNTRY_CODES_FILE = Path(__file__).parent / 'country_codes.csv'
 
 # ============================================================================

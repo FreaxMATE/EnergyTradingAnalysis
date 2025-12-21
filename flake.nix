@@ -42,6 +42,7 @@
         python312Packages.dash
         python312Packages.gunicorn
         python312Packages.python-dotenv
+        python312Packages.statsmodels
         entsoe-py
       ];
     };

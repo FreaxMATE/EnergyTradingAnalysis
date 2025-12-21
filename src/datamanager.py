@@ -6,7 +6,7 @@ import pandas as pd
 from entsoe import EntsoePandasClient
 
 import utils
-import dataanalysis
+from analysis import AnalysisRunner, MovingAverageAnalyzer, ForecastAnalyzer
 from logger import setup_logger
 from config import (
     DATA_DIR,
@@ -176,8 +176,32 @@ class DataManager:
         try:
             if self.__data is None:
                 raise ValueError("Data not loaded")
-            ma_df = dataanalysis.ma(df=self.__data[country_code])
-            self.save_analysis(country_code, ma_df, feature='ma')
+            
+            df = self.__data[country_code]
+
+            # 1. Moving Average on full data
+            ma_runner = AnalysisRunner()
+            ma_runner.add_analyzer(MovingAverageAnalyzer())
+            ma_results = ma_runner.run_all(df)
+            
+            if 'MovingAverageAnalyzer' in ma_results:
+                self.save_analysis(country_code, ma_results['MovingAverageAnalyzer'], feature='ma')
+
+            # 2. Forecast on subset (last 365 days)
+            forecast_runner = AnalysisRunner()
+            forecast_runner.add_analyzer(ForecastAnalyzer(forecast_horizon_days=2, backtest_days=3, step_hours=9))
+            
+            if not df.empty:
+                last_time = df['time'].max()
+                start_time = last_time - pd.Timedelta(days=365)
+                df_subset = df[df['time'] >= start_time].copy()
+                forecast_results = forecast_runner.run_all(df_subset)
+            else:
+                forecast_results = forecast_runner.run_all(df)
+                
+            if 'ForecastAnalyzer' in forecast_results:
+                self.save_analysis(country_code, forecast_results['ForecastAnalyzer'], feature='forecast')
+                
             logger.debug(f"Analysis completed for {country_code}")
         except Exception as e:
             logger.error(f"Error analyzing {country_code}: {e}")
@@ -211,8 +235,8 @@ class DataManager:
         """Update features.csv with new features."""
         features_file = self.__directory / "features.csv"
         try:
-            if not features_file.exists():
-                pd.DataFrame({'ma': []}).to_csv(features_file, index=False)
+            # Always ensure 'ma' and 'forecast' are present
+            pd.DataFrame({'ma': [], 'forecast': []}).to_csv(features_file, index=False)
             logger.debug("Features file updated")
         except Exception as e:
             logger.error(f"Error updating features file: {e}")
@@ -279,6 +303,10 @@ class DataManager:
                 append = True
                 logger.debug(f"Resuming from {start_date}")
             
+            if start_date >= end_date:
+                logger.info(f"Data for {country_code} is already up to date.")
+                return
+
             logger.debug(f"Fetching data from {start_date} to {end_date}...")
             day_ahead_prices = client.query_day_ahead_prices(country_code, start_date, end_date)
             
