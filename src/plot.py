@@ -49,19 +49,27 @@ def create_dash_app() -> Dash:
             id='dropdown-selection',
             style={'marginBottom': 20}
         ),
-        html.H2(children='Last 48 Hours'),
-        dcc.Graph(id='graph-content-24h'),
-        html.H2(children='Full Range'),
+        html.Div([
+            html.Div([
+                html.H2(children='Last 48 Hours Price'),
+                dcc.Graph(id='graph-content-24h'),
+            ], style={'width': '49%', 'display': 'inline-block', 'verticalAlign': 'top'}),
+            html.Div([
+                html.H2(children='Last 48 Hours Generation'),
+                dcc.Graph(id='graph-content-generation'),
+            ], style={'width': '49%', 'display': 'inline-block', 'verticalAlign': 'top'})
+        ], style={'display': 'flex', 'justifyContent': 'space-between'}),
+        html.H2(children='Full Range Price'),
         dcc.Graph(id='graph-content')
     ]
     
     server = app.server
 
     @app.callback(
-        [Output('graph-content', 'figure'), Output('graph-content-24h', 'figure')],
+        [Output('graph-content', 'figure'), Output('graph-content-24h', 'figure'), Output('graph-content-generation', 'figure')],
         [Input('dropdown-selection', 'value')]
     )
-    def update_graphs(selected_country: str) -> Tuple[go.Figure, go.Figure]:
+    def update_graphs(selected_country: str) -> Tuple[go.Figure, go.Figure, go.Figure]:
         """
         Update graphs based on selected country.
         
@@ -69,7 +77,7 @@ def create_dash_app() -> Dash:
             selected_country (str): Selected country code
         
         Returns:
-            Tuple[go.Figure, go.Figure]: Full range figure and 24h figure
+            Tuple[go.Figure, go.Figure, go.Figure]: Full range figure, 24h figure, and generation figure
         """
         try:
             df = dm.data[selected_country]
@@ -263,17 +271,42 @@ def create_dash_app() -> Dash:
             else:
                 fig_24h.update_yaxes(title_text='Price (EUR/MWh)')
             
+            # Generation Plot
+            fig_gen = go.Figure()
+            try:
+                gen_data = dm.generation_data.get(selected_country)
+                if gen_data is not None and not gen_data.empty:
+                    mask = (gen_data['time'] >= start_zoom) & (gen_data['time'] <= end_zoom)
+                    gen_subset = gen_data[mask]
+                    
+                    if not gen_subset.empty:
+                        gen_cols = [c for c in gen_subset.columns if c != 'time']
+                        fig_gen = px.area(
+                            gen_subset,
+                            x='time',
+                            y=gen_cols,
+                            title=f'Generation Mix (Last 48h) - {selected_country}'
+                        )
+                        fig_gen.update_xaxes(range=[start_zoom, end_zoom], title_text='Time')
+                        fig_gen.update_yaxes(title_text='MW')
+                else:
+                    fig_gen.add_annotation(text="No generation data available", showarrow=False)
+                    fig_gen.update_layout(title=f'Generation Mix - {selected_country}')
+            except Exception as e:
+                logger.error(f"Error plotting generation for {selected_country}: {e}")
+                fig_gen.add_annotation(text=f"Error: {e}", showarrow=False)
+
             logger.info(f"Graphs updated for {selected_country}")
-            return fig, fig_24h
+            return fig, fig_24h, fig_gen
         
         except KeyError:
             logger.error(f"Data not available for {selected_country}")
             empty_fig = px.line(title=f'No data available for {selected_country}')
-            return empty_fig, empty_fig
+            return empty_fig, empty_fig, empty_fig
         except Exception as e:
             logger.error(f"Error updating graphs: {e}")
             empty_fig = px.line(title=f'Error loading data: {str(e)}')
-            return empty_fig, empty_fig
+            return empty_fig, empty_fig, empty_fig
 
     return app
 

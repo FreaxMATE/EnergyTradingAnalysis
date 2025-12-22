@@ -42,6 +42,7 @@ class DataManager:
         self.__country_codes = self.__load_country_codes()
         self.__data: Optional[Dict] = self.__read_data() if read_mode in ('data', 'feature') else None
         self.__features: Optional[Dict] = self.__read_features() if read_mode == 'feature' else None
+        self.__generation_data: Optional[Dict] = self.__read_generation_data() if read_mode in ('data', 'feature') else None
         logger.info(f"DataManager initialized with read_mode={read_mode}")
 
     def __load_country_codes(self) -> pd.Series:
@@ -80,6 +81,15 @@ class DataManager:
         return self.__features
 
     @property
+    def generation_data(self) -> Dict[str, pd.DataFrame]:
+        """Get loaded generation data."""
+        if self.__generation_data is None:
+            if self.__data is None:
+                raise ValueError("Data not loaded. Initialize with read_mode='data' or 'feature'")
+            return {}
+        return self.__generation_data
+
+    @property
     def country_codes(self) -> pd.Series:
         """Get country codes."""
         return self.__country_codes
@@ -112,6 +122,28 @@ class DataManager:
             except Exception as e:
                 logger.error(f"Error reading data for {country_code}: {e}")
         
+        return data
+
+    def __read_generation_data(self) -> Dict[str, pd.DataFrame]:
+        """
+        Read generation data for all countries.
+        
+        Returns:
+            Dict[str, pd.DataFrame]: Dictionary mapping country codes to generation DataFrames
+        """
+        data = {}
+        for country_code in self.__country_codes:
+            try:
+                filepath = self.__directory / country_code / f"{country_code}_generation.csv"
+                if not filepath.exists():
+                    continue
+                
+                df = pd.read_csv(filepath, index_col=0, parse_dates=True)
+                df.index.name = 'time'
+                data[country_code] = df.reset_index()
+                logger.debug(f"Loaded generation data for {country_code}: {len(df)} rows")
+            except Exception as e:
+                logger.error(f"Error reading generation data for {country_code}: {e}")
         return data
 
     def __read_features(self) -> Dict[str, Dict[str, pd.DataFrame]]:
@@ -258,6 +290,7 @@ class DataManager:
             for i, country_code in enumerate(self.__country_codes, 1):
                 logger.info(f"[{i}/{len(self.__country_codes)}] Downloading {country_code}...")
                 self.download_by_country_code(client, country_code, start_date, end_date)
+                self.download_generation_by_country_code(client, country_code, start_date, end_date)
             
             logger.info("Download completed successfully")
         except Exception as e:
@@ -321,6 +354,54 @@ class DataManager:
         except Exception as e:
             logger.error(f"Error downloading {country_code}: {e}")
             raise DownloadException(f"Error downloading {country_code}: {e}")
+
+    def download_generation_by_country_code(
+        self, 
+        client: EntsoePandasClient, 
+        country_code: str, 
+        start_date: pd.Timestamp, 
+        end_date: pd.Timestamp
+    ) -> None:
+        """
+        Download generation data for a specific country.
+        """
+        directory = self.__directory / country_code
+        filepath = directory / f"{country_code}_generation.csv"
+        append = False
+        
+        try:
+            if filepath.exists():
+                last_line = utils.read_last_csv_line(str(filepath))
+                if last_line:
+                    last_saved_time = pd.Timestamp(
+                        last_line.strip().split(',')[0],
+                        tz=DEFAULT_TIMEZONE
+                    )
+                    start_date = last_saved_time + pd.Timedelta(hours=1)
+                    append = True
+                    logger.debug(f"Resuming generation from {start_date}")
+            
+            if start_date >= end_date:
+                return
+
+            logger.debug(f"Fetching generation data from {start_date} to {end_date}...")
+            df = client.query_generation(country_code, start=start_date, end=end_date, psr_type=None)
+            
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.get_level_values(0)
+            
+            directory.mkdir(parents=True, exist_ok=True)
+            
+            if not append:
+                df.to_csv(filepath)
+            else:
+                existing_df = pd.read_csv(filepath, nrows=0, index_col=0)
+                df = df.reindex(columns=existing_df.columns)
+                df.to_csv(filepath, mode='a', header=False)
+            
+            logger.info(f"Successfully downloaded generation for {country_code}: {len(df)} rows")
+        except Exception as e:
+            logger.error(f"Error downloading generation for {country_code}: {e}")
 
 if __name__ == '__main__':
     data_manager = DataManager()
