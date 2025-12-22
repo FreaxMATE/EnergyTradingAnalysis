@@ -2,75 +2,17 @@ version: '3.8'
 
 services:
   dashboard:
-    build: .
-    container_name: energy-trading-dashboard
+    # Replace with your actual image path (lowercase)
+    image: ghcr.io/kunruh/energytradinganalysis:latest
     ports:
-      - "8050:8050"
-    volumes:
-      - ./data:/app/data
-      - ./output:/app/output
+      - "8501:8501" # Adjust ports as needed
+    restart: always
     environment:
-      - PYTHONUNBUFFERED=1
-    command: ["python", "src/main.py", "plot"]
+      - TZ=Europe/Berlin # Optional: Set timezone
 
-  scheduler:
-    build: .
-    container_name: energy-trading-scheduler
+  watchtower:
+    image: containrrr/watchtower
     volumes:
-      - ./data:/app/data
-    environment:
-      - ENTSOE_API_KEY=${ENTSOE_API_KEY}
-    entrypoint: /bin/sh
-    command: 
-      - -c
-      - |
-        echo "Starting scheduler - will download data every hour"
-        while true; do
-          echo "$(date): Downloading latest energy price data..."
-          python src/main.py download
-          echo "$(date): Download complete. Sleeping for 1 hour..."
-          sleep 3600
-        done
-    restart: unless-stopped
-    profiles:
-      - scheduler
-
-  download:
-    build: .
-    container_name: energy-trading-download
-    volumes:
-      - ./data:/app/data
-    command: ["python", "src/main.py", "download"]
-    profiles:
-      - download
-
-  analyze:
-    build: .
-    container_name: energy-trading-analyze
-    volumes:
-      - ./data:/app/data
-    command: ["python", "src/main.py", "analyze"]
-    profiles:
-      - analyze
-
-  legacy-scheduled:
-    build: .
-    container_name: energy-trading-scheduled
-    volumes:
-      - ./data:/app/data
-      - ./output:/app/output
-    working_dir: /app/src
-    command: ["python", "legacy/scheduled_procurement.py"]
-    profiles:
-      - legacy
-
-  legacy-dayprices:
-    build: .
-    container_name: energy-trading-dayprices
-    volumes:
-      - ./data:/app/data
-      - ./output:/app/output
-    working_dir: /app/src
-    command: ["python", "legacy/day_prices.py"]
-    profiles:
-      - legacy
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --interval 300 # Check for updates every 5 minutes
+    restart: always
