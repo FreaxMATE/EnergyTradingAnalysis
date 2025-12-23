@@ -52,16 +52,16 @@ def create_dash_app() -> Dash:
         html.Div([
             html.Div([
                 html.H2(children='Last 48 Hours Price'),
-                dcc.Graph(id='graph-content-24h', style={'width': '100%', 'height': '100%'})
+                dcc.Graph(id='graph-content-24h', style={'width': '100%', 'height': '400px'})
             ], style={'width': '49%', 'display': 'inline-block', 'verticalAlign': 'top'}),
             html.Div([
                 html.H2(children='Last 48 Hours Generation'),
-                dcc.Graph(id='graph-content-generation', style={'width': '100%', 'height': '100%'})
+                dcc.Graph(id='graph-content-generation', style={'width': '100%', 'height': '400px'})
             ], style={'width': '49%', 'display': 'inline-block', 'verticalAlign': 'top'})
         ], style={'width': '100%', 'display': 'flex'}),
         html.H2(children='Full Range Price'),
-        dcc.Graph(id='graph-content', style={'width': '100%', 'height': '100%'})
-    ], style={'width': '100%', 'height': '100vh'})
+        dcc.Graph(id='graph-content', style={'width': '100%', 'height': '400px'})
+    ], style={'width': '100%'})
     
     server = app.server
 
