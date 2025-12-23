@@ -55,7 +55,7 @@ def create_dash_app() -> Dash:
                 dcc.Graph(id='graph-content-24h', style={'width': '100%', 'height': '400px'})
             ], style={'width': '49%', 'display': 'inline-block', 'verticalAlign': 'top'}),
             html.Div([
-                html.H2(children='Last 48 Hours Generation'),
+                html.H2(children='Generation Mix'),
                 dcc.Graph(id='graph-content-generation', style={'width': '100%', 'height': '400px'})
             ], style={'width': '49%', 'display': 'inline-block', 'verticalAlign': 'top'})
         ], style={'width': '100%', 'display': 'flex'}),
@@ -276,19 +276,15 @@ def create_dash_app() -> Dash:
             try:
                 gen_data = dm.generation_data.get(selected_country)
                 if gen_data is not None and not gen_data.empty:
-                    mask = (gen_data['time'] >= start_zoom) & (gen_data['time'] <= end_zoom)
-                    gen_subset = gen_data[mask]
-                    
-                    if not gen_subset.empty:
-                        gen_cols = [c for c in gen_subset.columns if c != 'time']
-                        fig_gen = px.area(
-                            gen_subset,
-                            x='time',
-                            y=gen_cols,
-                            title=f'Generation Mix (Last 48h) - {selected_country}'
-                        )
-                        fig_gen.update_xaxes(range=[start_zoom, end_zoom], title_text='Time')
-                        fig_gen.update_yaxes(title_text='MW')
+                    gen_cols = [c for c in gen_data.columns if c != 'time']
+                    fig_gen = px.area(
+                        gen_data,
+                        x='time',
+                        y=gen_cols,
+                        title=f'Generation Mix - {selected_country}'
+                    )
+                    fig_gen.update_xaxes(title_text='Time')
+                    fig_gen.update_yaxes(title_text='MW')
                 else:
                     fig_gen.add_annotation(text="No generation data available", showarrow=False)
                     fig_gen.update_layout(title=f'Generation Mix - {selected_country}')
