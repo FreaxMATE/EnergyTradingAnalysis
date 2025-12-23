@@ -38,7 +38,7 @@ def create_dash_app() -> Dash:
     
     # Set app title and layout
     app.title = 'Energy Trading Analysis'
-    app.layout = [
+    app.layout = html.Div([
         html.H1(
             children='Energy Trading Analysis',
             style={'textAlign': 'center', 'marginBottom': 30}
@@ -52,16 +52,16 @@ def create_dash_app() -> Dash:
         html.Div([
             html.Div([
                 html.H2(children='Last 48 Hours Price'),
-                dcc.Graph(id='graph-content-24h'),
+                dcc.Graph(id='graph-content-24h', style={'width': '100%', 'height': '100%'})
             ], style={'width': '49%', 'display': 'inline-block', 'verticalAlign': 'top'}),
             html.Div([
                 html.H2(children='Last 48 Hours Generation'),
-                dcc.Graph(id='graph-content-generation'),
+                dcc.Graph(id='graph-content-generation', style={'width': '100%', 'height': '100%'})
             ], style={'width': '49%', 'display': 'inline-block', 'verticalAlign': 'top'})
-        ], style={'display': 'flex', 'justifyContent': 'space-between'}),
+        ], style={'width': '100%', 'display': 'flex'}),
         html.H2(children='Full Range Price'),
-        dcc.Graph(id='graph-content')
-    ]
+        dcc.Graph(id='graph-content', style={'width': '100%', 'height': '100%'})
+    ], style={'width': '100%', 'height': '100vh'})
     
     server = app.server
 

@@ -1,18 +1,8 @@
-version: '3.8'
-
 services:
-  dashboard:
-    # Replace with your actual image path (lowercase)
-    image: ghcr.io/kunruh/energytradinganalysis:latest
+  dash-app:
+    image: ghcr.io/freaxmate/energytradinganalysis:latest
     ports:
-      - "8501:8501" # Adjust ports as needed
+      - "80:8050"
     restart: always
-    environment:
-      - TZ=Europe/Berlin # Optional: Set timezone
-
-  watchtower:
-    image: containrrr/watchtower
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    command: --interval 300 # Check for updates every 5 minutes
-    restart: always
+    env_file:
+      - .env
