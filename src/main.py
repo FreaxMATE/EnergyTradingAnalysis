@@ -12,7 +12,7 @@ logger = setup_logger(__name__)
 def main() -> None:
     """Main entry point with CLI argument handling."""
     if len(sys.argv) < 2:
-        print("Usage: python main.py [download|analyze|plot]")
+        print("Usage: python main.py [download|analyze]")
         sys.exit(1)
 
     mode = sys.argv[1].lower()
@@ -28,9 +28,6 @@ def main() -> None:
             dm = DataManager(read_mode='data')
             dm.analysis()
             logger.info("Analysis completed successfully")
-        elif mode == "plot":
-            logger.info("Starting plot mode...")
-            run_dash_app()
         else:
             print("Unknown mode. Use one of: download, analyze, plot")
             sys.exit(1)
