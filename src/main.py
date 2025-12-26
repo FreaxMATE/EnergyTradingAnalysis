@@ -3,7 +3,6 @@
 import sys
 from logger import setup_logger
 from datamanager import DataManager
-from plot import run_dash_app
 from exceptions import EnergyTradingException
 
 logger = setup_logger(__name__)

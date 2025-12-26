@@ -116,6 +116,11 @@ def create_static_dashboard(country_code: str, dm=None):
         
         df_gen_zoom = prepare_data(df_gen_zoom)
         
+        # Fill NaNs with 0 and clip negative values to prevent rendering artifacts in stacked area charts
+        df_gen_zoom = df_gen_zoom.fillna(0)
+        num_cols = df_gen_zoom.select_dtypes(include=['number']).columns
+        df_gen_zoom[num_cols] = df_gen_zoom[num_cols].clip(lower=0)
+        
         if not df_gen_zoom.empty:
             gen_cols = [c for c in df_gen.columns if c != 'time']
             
