@@ -1,164 +1,174 @@
-# Energy Trading Day-Ahead Price Analysis
-
-A Python-based tool for exploring and optimizing energy procurement strategies using Danish day-ahead electricity prices (DK2). The centerpiece is an **interactive dashboard** for visualizing price trends, moving averages, and predictions for multiple countries.
-
-## 🖼️ Interactive Dashboard
+# Energy Trading Analysis
 
 ![Dashboard Screenshot](screenshot.png)
 
-*Example: Dash web app showing price and moving average for selected country. Explore historical trends, zoom into the last 24 hours, and compare predictive features interactively.*
+Download, analyze, and publish ENTSO-E day-ahead spot prices (and generation mix) per bidding zone/country, with computed features (moving average + Holt‑Winters forecasts) and static HTML dashboards.
 
-## 📊 Features
+Core entry points:
+- CLI: [`main.main`](src/main.py) in [src/main.py](src/main.py)
+- Data pipeline: [`datamanager.DataManager`](src/datamanager.py) in [src/datamanager.py](src/datamanager.py)
+- Analyses: [`analysis.MovingAverageAnalyzer`](src/analysis.py), [`analysis.ForecastAnalyzer`](src/analysis.py), orchestrated by [`analysis.AnalysisRunner`](src/analysis.py) in [src/analysis.py](src/analysis.py)
+- Static reporting: [`plot_bokeh.create_static_dashboard`](src/plot_bokeh.py) + [`plot_bokeh.generate_index_html`](src/plot_bokeh.py) in [src/plot_bokeh.py](src/plot_bokeh.py)
 
-- **Interactive Dashboard**: Explore price and moving average trends for any country using a Dash web app (`src/plot.py`).
-- **SciChart.js Stack**: High-performance alternative visualization using Flask + SciChart.js (`src/plot_scichart.py`).
-- **Static HTML Reports**: 
-    - **Bokeh (Recommended)**: High-performance, standalone HTML reports suitable for VCS hosting (`src/plot_bokeh.py`).
-    - **ECharts**: Legacy static reports (`src/plot_echarts.py`).
-- **Historical Price Analysis**: Processes 3 years of hourly electricity price data (2023-2025).
-- **Procurement Optimization**: Implements adaptive procurement algorithm with configurable parameters.
-- **Cost Analysis**: Compares total costs across different procurement frequencies (1-24 times per year).
-- **Visualization**: Generates comprehensive charts showing price trends and optimal purchase points.
+---
 
-## 🚀 Quick Start
+## What it does
 
-### Prerequisites
-- Python 3.8+ (Windows, macOS, Linux)
-- Git (optional)
+1. **Downloads data from ENTSO-E**
+   - Spot prices per country code via `EntsoePandasClient` inside [`datamanager.DataManager.download`](src/datamanager.py) → [`datamanager.DataManager.download_by_country_code`](src/datamanager.py).
+   - Generation mix per country code via [`datamanager.DataManager.download_generation_by_country_code`](src/datamanager.py).
 
-### Installation
+2. **Stores data on disk**
+   - Price data is loaded with CSV schema `time, price` by [`datamanager.DataManager.__read_data`](src/datamanager.py).
+   - Features are saved as `{country}_{feature}.csv` by [`datamanager.DataManager.save_analysis`](src/datamanager.py) and discovered via [`datamanager.DataManager.__read_features`](src/datamanager.py).
+   - `data/features.csv` is (re)generated with `ma` and `forecast` columns by [`datamanager.DataManager.__update_features_file`](src/datamanager.py).
 
-**Simple Setup:**
-```bash
-git clone <repository-url>
-cd EnergyTradingAnalysis
-pip install -r requirements.txt
+3. **Runs analyses**
+   - Moving average feature `ma` via [`analysis.MovingAverageAnalyzer.analyze`](src/analysis.py).
+   - Forecast feature(s) via Holt‑Winters exponential smoothing in [`analysis.ForecastAnalyzer.analyze`](src/analysis.py).
+
+4. **Generates static HTML reports**
+   - Per-country report: [`plot_bokeh.create_static_dashboard`](src/plot_bokeh.py) (Bokeh, WebGL, downsampling).
+   - Dashboard index that links all reports: [`plot_bokeh.generate_index_html`](src/plot_bokeh.py).
+
+---
+
+## Repository layout (high-level)
+
+- Source code: [src/](src/)
+  - Data pipeline: [src/datamanager.py](src/datamanager.py)
+  - Analysis: [src/analysis.py](src/analysis.py)
+  - Static reporting: [src/plot_bokeh.py](src/plot_bokeh.py)
+  - Config: [src/config.py](src/config.py)
+  - Utilities: [src/utils.py](src/utils.py)
+  - Logging: [src/logger.py](src/logger.py)
+  - Exceptions: [src/exceptions.py](src/exceptions.py)
+- Data (CSV): [data/](data/)
+- Generated static site output directory (configured): [doc/](doc/) via `OUTPUT_DIR` in [src/config.py](src/config.py)
+- Prebuilt/served static site directory (also present): [docs/](docs/) and [Dockerfile](Dockerfile)
+
+Note: both [doc/](doc/) and [docs/](docs/) exist. `OUTPUT_DIR` is set to `doc/` in [src/config.py](src/config.py), while the [Dockerfile](Dockerfile) copies `docs/` into nginx. If you want Docker to serve newly generated reports, ensure the generated output ends up in the directory being served.
+
+---
+
+## Requirements
+
+- Python **3.8+** (setup script enforces this) — see [scripts/setup.sh](scripts/setup.sh) and [scripts/setup.bat](scripts/setup.bat)
+- An **ENTSOE API key** (see configuration below)
+- Python dependencies in [requirements.txt](requirements.txt) (also Nix dev shell in [flake.nix](flake.nix))
+
+---
+
+## Configuration
+
+This project expects an ENTSO-E API key via environment variables.
+
+- `.env.example` shows the expected shape: [.env.example](.env.example)
+- Local overrides: `.env` (not committed) — [.env](.env)
+- Config validation happens in [src/config.py](src/config.py). Missing key raises [`exceptions.ConfigException`](src/exceptions.py).
+
+Required:
+- `ENTSOE_API_KEY`: ENTSO-E Transparency Platform API key (used by `EntsoePandasClient` inside [`datamanager.DataManager.download`](src/datamanager.py)).
+
+---
+
+## Quickstart (venv)
+
+### 1) Create and install
+Use the provided scripts:
+
+```sh
+./scripts/setup.sh
 ```
 
-**Alternative Methods:**
-- **Automated**: Run `./scripts/setup.sh` (Linux/macOS) or `scripts\setup.bat` (Windows)
-- **Conda**: `conda env create -f environment.yml && conda activate energy-trading-analysis`
-- **Docker**: `docker-compose up --build`
-- **Nix**: `nix develop` (Linux/macOS)
+Windows:
 
-### Running the Dashboard & Analysis
-
-From the `src/` directory:
-
-```bash
-cd src
-python main.py plot                # launch interactive dashboard (Dash)
-python plot_scichart.py            # launch high-performance dashboard (SciChart.js)
-python plot_bokeh.py [COUNTRY]     # generate high-performance static report (e.g., DK_2)
-python plot_echarts.py [COUNTRY]   # generate legacy static HTML report
-python scheduled_procurement.py    # scheduling analysis + day-ahead trend plot
-python day_prices.py               # hourly profile (price by hour) plot
+```bat
+scripts\setup.bat
 ```
 
-**Generated Output:**
-- `output/dash_screenshot.png`: Dashboard screenshot (add manually)
-- `output/report_DK_2.html`: Interactive HTML report generated by Bokeh (or ECharts)
-- `output/dayaheadprices.png`: Price trends with optimal purchase points (produced by `scheduled_procurement.py`)
-- `output/total_cost_vs_nproc.png`: Total cost vs number of procurements (produced by `scheduled_procurement.py`)
-- `output/price_by_hour.png`: Average price by hour with error bars (produced by `day_prices.py`)
+(They create `venv/` and install from [requirements.txt](requirements.txt).)
 
-## 📁 Project Structure
+### 2) Set your ENTSO-E key
+Create `.env` at repo root (or export env var):
 
-```
-├── src/                     # Source code and analysis scripts
-│   ├── main.py                  # CLI entry point (download, analyze, plot)
-│   ├── plot.py                  # Dash dashboard for interactive exploration
-│   ├── plot_scichart.py         # High-performance dashboard using SciChart.js
-│   ├── plot_bokeh.py             # Generate static HTML reports with Bokeh
-│   ├── plot_echarts.py           # Generate static HTML reports with ECharts
-│   ├── datamanager.py           # Data loading and feature extraction
-│   ├── dataanalysis.py          # Analysis functions (moving average, prediction)
-│   ├── scheduled_procurement.py # Procurement optimization analysis
-│   ├── day_prices.py            # Hourly price profile and plot
-│   └── utils.py                 # Utility functions
-├── data/                    # CSV price data files (2023-2025)
-├── output/                  # Generated visualizations (PNG files)
-├── scripts/                 # Setup scripts for different platforms
-├── requirements.txt         # Python dependencies
-├── environment.yml          # Conda environment
-├── Dockerfile               # Docker support
-├── docker-compose.yml       # Docker orchestration
-├── flake.nix                # Nix environment
-└── README.md                # Project documentation
+```sh
+export ENTSOE_API_KEY="your_key_here"
 ```
 
-## 🔬 Algorithm Overview
+### 3) Download data
+Runs ENTSO-E pulls for all configured country codes:
 
-**Data Source**: [ENTSO-E Transparency Platform](https://newtransparency.entsoe.eu/)
-- Market: DK2 (Denmark Eastern) day-ahead prices
-- Resolution: Hourly data, converted to daily averages
-- Period: 2023-2025
-
-**Procurement Strategy (`sched_proc` function):**
-1. **Time Partitioning**: Divides the year into `n_parts` equal segments
-2. **Reference Tracking**: Maintains reference price that updates to lower values
-3. **Purchase Trigger**: Buys energy when price exceeds `reference + limit` (default: €10/MWh)
-4. **Cost Calculation**: Computes total cost for specified energy volume (default: 1000 MWh)
-
-**Parameters:**
-- `mwhs`: Total energy to procure (default: 1000 MWh)
-- `n_parts`: Number of procurement periods (tested: 1, 2, 3, 4, 6, 12, 24)
-- `limit`: Price increase threshold (default: €10/MWh)
-
-## 📈 Key Results
-
-- **Optimal Frequency**: Usually 3-6 procurements per year minimize total costs
-- **Cost Savings**: Significant reduction compared to single annual purchase
-- **Seasonal Patterns**: Purchase timing typically aligns with seasonal price cycles
-- **Diminishing Returns**: Increased procurement frequency shows diminishing cost benefits
-
-## 🛠️ Usage Examples
-
-**Basic Analysis:**
-```python
-buy_indices, total_cost = sched_proc(price_avg)
+```sh
+python src/main.py download
 ```
 
-**Custom Parameters:**
-```python
-buy_indices, total_cost = sched_proc(
-    price=price_avg, 
-    mwhs=2000,      # 2000 MWh total
-    n_parts=6,      # 6 procurements per year
-    limit=15        # €15/MWh threshold
-)
+This calls [`datamanager.DataManager.download`](src/datamanager.py), which iterates `country_codes.csv` (see `COUNTRY_CODES_FILE` in [src/config.py](src/config.py)).
+
+### 4) Analyze data
+Computes moving average + forecasts per country:
+
+```sh
+python src/main.py analyze
 ```
 
-## 🔧 Troubleshooting
+This calls [`datamanager.DataManager.analysis`](src/datamanager.py) → [`datamanager.DataManager.analysis_by_country_code`](src/datamanager.py), using [`analysis.AnalysisRunner`](src/analysis.py) with [`analysis.MovingAverageAnalyzer`](src/analysis.py) and [`analysis.ForecastAnalyzer`](src/analysis.py).
 
-**Common Issues:**
-- Ensure Python 3.8+ is installed
-- Activate virtual environment before running
-- Use `python3` if `python` points to Python 2.x
-- On Linux/macOS: `chmod +x scripts/setup.sh` if permission denied
+### 5) Generate static dashboards
+Generate per-country reports and the index dashboard:
 
-## 📄 License
+```sh
+python src/plot_bokeh.py
+```
 
-Educational and research use. Price data from ENTSO-E under their terms of use.
+Outputs:
+- `report_{COUNTRY}.html` files into `OUTPUT_DIR` (configured as `doc/`) in [src/config.py](src/config.py)
+- `index.html` dashboard via [`plot_bokeh.generate_index_html`](src/plot_bokeh.py)
 
-## 📸 Plots (output/)
+Open in a browser:
+- [doc/index.html](doc/index.html)
 
-The repository includes example generated visualizations in the `output/` directory. If you run the scripts above they will be (re)created.
+---
 
-- dayaheadprices.png
+## Data & file conventions
 
-![Day-ahead prices with procurement points](output/dayaheadprices.png)
+### Prices
+- Loaded by [`datamanager.DataManager.__read_data`](src/datamanager.py) as:
+  - `time` (UTC parsed), `price`
 
-Caption: Daily-averaged day-ahead prices with procurement markers for different numbers of procurements (N_proc). Each marker shows the time and price where the algorithm decided to buy — useful to inspect timing and clustering of purchase points.
+### Features
+- Written by [`datamanager.DataManager.save_analysis`](src/datamanager.py) to per-country files:
+  - `{country}_ma.csv` (moving average output includes `ma`)
+  - `{country}_forecast.csv` (forecast output contains multiple forecast columns)
+- Registry file: `data/features.csv` maintained by [`datamanager.DataManager.__update_features_file`](src/datamanager.py)
 
-- total_cost_vs_nproc.png
+### Utilities used by the pipeline
+- Efficient incremental download uses [`utils.read_last_csv_line`](src/utils.py) (reads last CSV line) in [`datamanager.DataManager.download_by_country_code`](src/datamanager.py).
+- Time-window extraction helper: [`utils.extract_last`](src/utils.py) in [src/utils.py](src/utils.py).
 
-![Total cost vs number of procurements](output/total_cost_vs_nproc.png)
+---
 
-Caption: Total procurement cost (€) as a function of the number of procurements per year. Use this to identify the procurement frequency that minimizes total cost.
+## Development environments
 
-- price_by_hour.png
+### Nix dev shell
+A ready dev shell is defined in [flake.nix](flake.nix) (includes `entsoe-py`, pandas, statsmodels, bokeh, etc.).
 
-![Average price by hour](output/price_by_hour.png)
+### Docker (static site)
+The provided [Dockerfile](Dockerfile) serves static files through nginx and copies [docs/](docs/) into the container. If you want to serve the freshly generated content from [doc/](doc/), align the directories (either generate into `docs/` or serve `doc/`).
 
-Caption: Average day-ahead price by hour-of-day with error bars (standard deviation). Highlights intraday patterns and hours with highest/lowest average prices.
+See also: [docker-compose.yml](docker-compose.yml).
+
+---
+
+## Logging & troubleshooting
+
+- Logging is configured by [`logger.setup_logger`](src/logger.py) in [src/logger.py](src/logger.py) to both console and rotating files under [logs/](logs/).
+- Common failures:
+  - Missing `ENTSOE_API_KEY` → [`exceptions.ConfigException`](src/exceptions.py) raised by [src/config.py](src/config.py).
+  - Empty/malformed CSV → [`exceptions.DataException`](src/exceptions.py) used by [`utils.read_last_csv_line`](src/utils.py) and [`utils.extract_last`](src/utils.py).
+
+---
+
+## License
+
+Licensed under **GNU GPL v3.0** — see [LICENSE](LICENSE).
