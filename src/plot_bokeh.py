@@ -114,8 +114,7 @@ def create_static_dashboard(country_code: str, dm=None):
         start_gen = last_time - pd.Timedelta(days=90)
         df_gen_zoom = df_gen[df_gen['time'] >= start_gen].copy()
         
-        # Downsample to 4H for performance on 3-month view
-        df_gen_zoom = prepare_data(df_gen_zoom, resample_rule='4h')
+        df_gen_zoom = prepare_data(df_gen_zoom)
         
         if not df_gen_zoom.empty:
             gen_cols = [c for c in df_gen.columns if c != 'time']
