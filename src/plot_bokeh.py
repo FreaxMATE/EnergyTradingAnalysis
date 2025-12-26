@@ -13,10 +13,8 @@ from bokeh.palettes import Category20, Viridis256
 
 import datamanager as dmng
 from logger import setup_logger
-
+from config import OUTPUT_DIR
 logger = setup_logger(__name__)
-
-OUTPUT_DIR = Path(__file__).parent.parent / "output"
 
 def prepare_data(df, resample_rule=None):
     """Helper to prepare and optionally downsample data."""
