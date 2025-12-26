@@ -2,7 +2,7 @@ services:
   dash-app:
     image: ghcr.io/freaxmate/energytradinganalysis:latest
     ports:
-      - "80:8050"
+      - "80:80"
     restart: always
     env_file:
       - .env
