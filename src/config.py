@@ -14,7 +14,7 @@ load_dotenv()
 # ============================================================================
 BASE_DIR = Path(__file__).parent.parent
 DATA_DIR = BASE_DIR / 'data'
-OUTPUT_DIR = BASE_DIR / 'doc'
+OUTPUT_DIR = BASE_DIR / 'docs'
 LOGS_DIR = BASE_DIR / 'logs'
 SCRIPTS_DIR = BASE_DIR / 'scripts'
 
