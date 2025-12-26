@@ -138,9 +138,13 @@ class DataManager:
                 if not filepath.exists():
                     continue
                 
-                df = pd.read_csv(filepath, index_col=0, parse_dates=True)
+                df = pd.read_csv(filepath, index_col=0)
                 df.index.name = 'time'
-                data[country_code] = df.reset_index()
+                df = df.reset_index()
+                # Explicitly convert to datetime to avoid object/string types
+                df['time'] = pd.to_datetime(df['time'], utc=True)
+                
+                data[country_code] = df
                 logger.debug(f"Loaded generation data for {country_code}: {len(df)} rows")
             except Exception as e:
                 logger.error(f"Error reading generation data for {country_code}: {e}")

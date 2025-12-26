@@ -1,0 +1,11 @@
+{
+  "name": "energy-trading-analysis-scichart",
+  "version": "1.0.0",
+  "description": "SciChart.js visualization for Energy Trading Analysis",
+  "scripts": {
+    "start": "python src/plot_scichart.py"
+  },
+  "dependencies": {
+    "scichart": "^3.4.0"
+  }
+}

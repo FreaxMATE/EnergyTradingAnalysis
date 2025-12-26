@@ -40,10 +40,20 @@
         python312Packages.pandas
         python312Packages.plotly
         python312Packages.dash
+        python312Packages.flask
         python312Packages.gunicorn
         python312Packages.python-dotenv
         python312Packages.statsmodels
+        python312Packages.pyecharts
+        python312Packages.panel
+        python312Packages.bokeh
+        python312Packages.markdown-it-py
+        python312Packages.mdit-py-plugins
+        python312Packages.linkify-it-py
         entsoe-py
+        
+        # JS Stack
+        nodejs_22
       ];
     };
   };
