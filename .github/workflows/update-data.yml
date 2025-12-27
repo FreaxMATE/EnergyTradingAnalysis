@@ -34,6 +34,14 @@ jobs:
           ENTSOE_API_KEY: ${{ secrets.ENTSOE_API_KEY }}
         run: |
           python src/main.py download
+
+      - name: Run analysis
+        run: |
+          python src/main.py analyze
+
+      - name: Generate plots
+        run: |
+          python src/plot_bokeh.py
           
       - name: Commit and push if changed
         env:
@@ -42,5 +50,5 @@ jobs:
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add data/
+          git add data/ docs/
           git diff --quiet && git diff --staged --quiet || (git commit -m "Update energy price data - $(date -u +'%Y-%m-%d %H:%M UTC')" && git push)
