@@ -207,6 +207,9 @@ def generate_index_html():
         logger.warning("No reports found to generate index.")
         return
 
+    # Pre-generate list items to avoid backslashes in f-string expression (Python < 3.12 compat)
+    country_items = ''.join(f'<div class="country-link" onclick="loadReport(\'{c}\', this)">{c}</div>' for c in countries)
+
     html_content = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -373,7 +376,7 @@ def generate_index_html():
                 <h3>Bidding Zone</h3>
             </div>
             <div id="country-list">
-                {''.join(f'<div class="country-link" onclick="loadReport(\'{c}\', this)">{c}</div>' for c in countries)}
+                {country_items}
             </div>
         </div>
         <div id="content">
