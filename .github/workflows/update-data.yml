@@ -36,6 +36,8 @@ jobs:
           python src/main.py download
 
       - name: Run analysis
+        env:
+          ENTSOE_API_KEY: ${{ secrets.ENTSOE_API_KEY }}
         run: |
           python src/main.py analyze
 
