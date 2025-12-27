@@ -34,6 +34,9 @@
     in pkgs.mkShell {
       packages = with pkgs; [
         python312Packages.python
+        python312Packages.pyqt6
+        python312Packages.jupyter
+        python312Packages.notebook
         python312Packages.scipy
         python312Packages.numpy
         python312Packages.matplotlib
