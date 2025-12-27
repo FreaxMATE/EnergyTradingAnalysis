@@ -381,7 +381,12 @@ class DataManager:
                         last_line.strip().split(',')[0],
                         tz=DEFAULT_TIMEZONE
                     )
-                    start_date = last_saved_time + pd.Timedelta(hours=1)
+                    
+                    if last_saved_time > START_OF_15_MIN_SPOT_PRICE:
+                        start_date = last_saved_time + pd.Timedelta(minutes=15)
+                    else:
+                        start_date = last_saved_time + pd.Timedelta(hours=1)
+                        
                     append = True
                     logger.debug(f"Resuming generation from {start_date}")
             
@@ -400,6 +405,21 @@ class DataManager:
                 df.to_csv(filepath)
             else:
                 existing_df = pd.read_csv(filepath, nrows=0, index_col=0)
+                
+                # Handle duplicate columns in new data to match pandas read_csv mangling
+                # This ensures we can reindex against the existing file's columns
+                if not df.columns.is_unique:
+                    new_cols = []
+                    col_counts = {}
+                    for col in df.columns:
+                        if col in col_counts:
+                            col_counts[col] += 1
+                            new_cols.append(f"{col}.{col_counts[col]}")
+                        else:
+                            col_counts[col] = 0
+                            new_cols.append(col)
+                    df.columns = new_cols
+
                 df = df.reindex(columns=existing_df.columns)
                 df.to_csv(filepath, mode='a', header=False)
             
