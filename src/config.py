@@ -32,11 +32,11 @@ LOG_LEVEL = 'DEBUG' if DEBUG else 'INFO'
 # API CONFIGURATION
 # ============================================================================
 ENTSOE_API_KEY: str = os.getenv('ENTSOE_API_KEY', '')
-if not ENTSOE_API_KEY:
-    raise ConfigException(
-        "ENTSOE_API_KEY not found in environment variables. "
-        "Please set it in .env file or as an environment variable."
-    )
+# if not ENTSOE_API_KEY:
+#     raise ConfigException(
+#         "ENTSOE_API_KEY not found in environment variables. "
+#         "Please set it in .env file or as an environment variable."
+#     )
 
 # ============================================================================
 # DATA CONFIGURATION
