@@ -39,6 +39,7 @@
         python312Packages.notebook
         python312Packages.scipy
         python312Packages.numpy
+        python312Packages.torch
         python312Packages.matplotlib
         python312Packages.pandas
         python312Packages.plotly
