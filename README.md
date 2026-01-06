@@ -30,9 +30,6 @@ This repository provides utilities and pipelines to:
 - Typical Python packages: `pandas`, `numpy`, `statsmodels`, `bokeh`, `matplotlib`, `requests`
 - See `requirements.txt` and `environment.yml` for full lists
 
-System dependencies:
-- FFmpeg (optional) — only needed for any video/animation generation
-
 ## 💻 Setup & Installation
 
 ### Quick setup (Linux/macOS)
