@@ -1,6 +1,11 @@
 # Energy Trading Analysis
 
+
 A toolkit for ingesting, analyzing and statically reporting day-ahead electricity prices and generation mixes across European bidding zones. Produces per-country HTML reports (Bokeh), time-series features and simple forecasts useful for research, dashboards and reproducible reporting.
+
+
+[energytradinganalysis.com/
+](https://energytradinganalysis.com/)
 
 ![Energy Trading Analysis Dashboard](screenshot.png)
 
