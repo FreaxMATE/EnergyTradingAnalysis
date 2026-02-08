@@ -27,7 +27,7 @@ dependencies = [
     "numpy>=1.21.0",
     "pandas>=1.3.0",
     "matplotlib>=3.4.0",
-    "entsoe-py==0.7.8",
+    "entsoe-py>=0.7.10",
     "dash>=2.14.0",
     "plotly>=5.17.0",
     "gunicorn>=21.2.0",
@@ -35,6 +35,11 @@ dependencies = [
     "statsmodels>=0.14.0",
     "bokeh>=3.3.0",
     "tzdata",
+    "jupyter>=1.0.0",
+    "jupyterlab>=4.0.0",
+    "scikit-learn>=1.0.0",
+    "scipy>=1.8.0",
+    "seaborn>=0.12.0",
 ]
 
 [project.optional-dependencies]
