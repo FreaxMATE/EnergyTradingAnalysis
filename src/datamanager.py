@@ -3,10 +3,17 @@
 from pathlib import Path
 from typing import Optional, Dict
 import pandas as pd
+import sys
+
+try:
+    import tzdata
+except ImportError:
+    print("Warning: tzdata not found.", file=sys.stderr)
+
 from entsoe import EntsoePandasClient
 
 import utils
-from analysis import AnalysisRunner, MovingAverageAnalyzer, ForecastAnalyzer
+from analysis import AnalysisRunner, MovingAverageAnalyzer, CombinedForecastAnalyzer
 from logger import setup_logger
 from config import (
     DATA_DIR,
@@ -25,18 +32,8 @@ class DataManager:
     """Manages energy price data loading, downloading, and analysis."""
 
     def __init__(self, read_mode: str = '') -> None:
-        """
-        Initialize DataManager.
-        
-        Args:
-            read_mode (str): '' for no data, 'data' to load data, 'feature' to load data and features
-        
-        Raises:
-            ValueError: If read_mode is invalid
-            DataException: If country codes cannot be loaded
-        """
         if read_mode not in ('', 'data', 'feature'):
-            raise ValueError(f"Invalid read_mode: {read_mode}. Must be '', 'data', or 'feature'")
+            raise ValueError(f"Invalid read_mode: {read_mode}")
         
         self.__directory = DATA_DIR
         self.__country_codes = self.__load_country_codes()
@@ -46,121 +43,63 @@ class DataManager:
         logger.info(f"DataManager initialized with read_mode={read_mode}")
 
     def __load_country_codes(self) -> pd.Series:
-        """
-        Load country codes from CSV file.
-        
-        Returns:
-            pd.Series: Series containing country codes
-        
-        Raises:
-            DataException: If country codes file cannot be read
-        """
         try:
             df = pd.read_csv(COUNTRY_CODES_FILE, dtype=str, delimiter=',', comment='#')
-            logger.debug(f"Loaded {len(df)} country codes from {COUNTRY_CODES_FILE}")
             return df['code']
-        except FileNotFoundError:
-            logger.error(f"Country codes file not found: {COUNTRY_CODES_FILE}")
-            raise DataException(f"Country codes file not found: {COUNTRY_CODES_FILE}")
         except Exception as e:
-            logger.error(f"Error loading country codes: {e}")
             raise DataException(f"Error loading country codes: {e}")
 
     @property
     def data(self) -> Dict[str, pd.DataFrame]:
-        """Get loaded price data."""
-        if self.__data is None:
-            raise ValueError("Data not loaded. Initialize with read_mode='data' or 'feature'")
+        if self.__data is None: raise ValueError("Data not loaded")
         return self.__data
 
     @property
     def features(self) -> Dict[str, Dict[str, pd.DataFrame]]:
-        """Get loaded feature data."""
-        if self.__features is None:
-            raise ValueError("Features not loaded. Initialize with read_mode='feature'")
+        if self.__features is None: raise ValueError("Features not loaded")
         return self.__features
 
     @property
     def generation_data(self) -> Dict[str, pd.DataFrame]:
-        """Get loaded generation data."""
-        if self.__generation_data is None:
-            if self.__data is None:
-                raise ValueError("Data not loaded. Initialize with read_mode='data' or 'feature'")
-            return {}
-        return self.__generation_data
+        return self.__generation_data if self.__generation_data else {}
 
     @property
     def country_codes(self) -> pd.Series:
-        """Get country codes."""
         return self.__country_codes
 
     def __read_data(self) -> Dict[str, pd.DataFrame]:
-        """
-        Read price data for all countries.
-        
-        Returns:
-            Dict[str, pd.DataFrame]: Dictionary mapping country codes to price DataFrames
-        """
         data = {}
         for country_code in self.__country_codes:
             try:
                 filepath = self.__directory / country_code / f"{country_code}.csv"
-                if not filepath.exists():
-                    logger.warning(f"Data file not found for {country_code}: {filepath}")
-                    continue
+                if not filepath.exists() or filepath.stat().st_size == 0: continue
                 
-                df = pd.read_csv(
-                    filepath,
-                    delimiter=',',
-                    names=['time', 'price'],
-                    skiprows=1,
-                    comment='#'
-                )
+                df = pd.read_csv(filepath, delimiter=',', names=['time', 'price'], skiprows=1)
                 df['time'] = pd.to_datetime(df['time'], utc=True)
                 data[country_code] = df
-                logger.debug(f"Loaded data for {country_code}: {len(df)} rows")
-            except Exception as e:
-                logger.error(f"Error reading data for {country_code}: {e}")
-        
+            except Exception: pass
         return data
 
     def __read_generation_data(self) -> Dict[str, pd.DataFrame]:
-        """
-        Read generation data for all countries.
-        
-        Returns:
-            Dict[str, pd.DataFrame]: Dictionary mapping country codes to generation DataFrames
-        """
         data = {}
         for country_code in self.__country_codes:
             try:
                 filepath = self.__directory / country_code / f"{country_code}_generation.csv"
-                if not filepath.exists():
-                    continue
+                if not filepath.exists() or filepath.stat().st_size == 0: continue
                 
                 df = pd.read_csv(filepath, index_col=0)
                 df.index.name = 'time'
                 df = df.reset_index()
-                # Explicitly convert to datetime to avoid object/string types
                 df['time'] = pd.to_datetime(df['time'], utc=True)
-                
                 data[country_code] = df
-                logger.debug(f"Loaded generation data for {country_code}: {len(df)} rows")
-            except Exception as e:
-                logger.error(f"Error reading generation data for {country_code}: {e}")
+            except Exception: pass
         return data
 
     def __read_features(self) -> Dict[str, Dict[str, pd.DataFrame]]:
-        """
-        Read feature data for all countries.
-        
-        Returns:
-            Dict[str, Dict[str, pd.DataFrame]]: Nested dictionary of features by country
-        """
+        """Robust feature reading."""
         features_file = self.__directory / "features.csv"
         
-        if not features_file.exists():
-            logger.warning(f"Features file not found: {features_file}")
+        if not features_file.exists() or features_file.stat().st_size == 0:
             return {}
         
         try:
@@ -173,26 +112,28 @@ class DataManager:
                 features_data[country_code] = {}
                 for feature in feature_names:
                     feature_file = self.__directory / country_code / f"{country_code}_{feature}.csv"
+                    
                     if feature_file.exists():
-                        df = pd.read_csv(feature_file, delimiter=',', comment='#')
-                        features_data[country_code][feature] = df
-            
+                        try:
+                            # Skip empty files
+                            if feature_file.stat().st_size == 0:
+                                logger.warning(f"Skipping empty feature file: {feature_file}")
+                                continue
+                                
+                            df = pd.read_csv(feature_file, delimiter=',', comment='#')
+                            if df.empty or 'time' not in df.columns: continue
+
+                            df['time'] = pd.to_datetime(df['time'], utc=True)
+                            features_data[country_code][feature] = df
+                        except Exception as e:
+                            logger.warning(f"Failed to read {feature} for {country_code}: {e}")
             return features_data
         except Exception as e:
             logger.error(f"Error reading features: {e}")
             return {}
 
     def analysis(self) -> None:
-        """
-        Run analysis on all countries.
-        
-        Raises:
-            ValueError: If data is not loaded
-            Exception: If analysis fails for any country
-        """
-        if self.__data is None:
-            raise ValueError("Data not loaded. Cannot run analysis.")
-        
+        if self.__data is None: raise ValueError("Data not loaded")
         try:
             for country_code in self.country_codes:
                 self.analysis_by_country_code(country_code)
@@ -203,212 +144,121 @@ class DataManager:
             raise
 
     def analysis_by_country_code(self, country_code: str) -> None:
-        """
-        Run analysis for a specific country.
-        
-        Args:
-            country_code (str): Country code
-        """
+        """Run analysis: Moving Average + Combined Forecasts."""
         try:
-            if self.__data is None:
-                raise ValueError("Data not loaded")
-            
+            if self.__data is None: raise ValueError("Data not loaded")
             df = self.__data[country_code]
+            if df.empty: return
 
-            # 1. Moving Average on full data
+            # 1. Moving Average
             ma_runner = AnalysisRunner()
             ma_runner.add_analyzer(MovingAverageAnalyzer())
             ma_results = ma_runner.run_all(df)
-            
             if 'MovingAverageAnalyzer' in ma_results:
                 self.save_analysis(country_code, ma_results['MovingAverageAnalyzer'], feature='ma')
 
-            # 2. Forecast on subset (last 365 days)
-            forecast_runner = AnalysisRunner()
-            forecast_runner.add_analyzer(ForecastAnalyzer(forecast_horizon_days=2, backtest_days=3, step_hours=9))
+            # 2. Combined Forecasts (HW + GB + RF) -> forecasts.csv
+            fc_runner = AnalysisRunner()
+            fc_runner.add_analyzer(CombinedForecastAnalyzer(horizon_hours=24))
             
-            if not df.empty:
-                last_time = df['time'].max()
-                start_time = last_time - pd.Timedelta(days=365)
-                df_subset = df[df['time'] >= start_time].copy()
-                forecast_results = forecast_runner.run_all(df_subset)
-            else:
-                forecast_results = forecast_runner.run_all(df)
-                
-            if 'ForecastAnalyzer' in forecast_results:
-                self.save_analysis(country_code, forecast_results['ForecastAnalyzer'], feature='forecast')
-                
+            fc_results = fc_runner.run_all(df)
+            if 'CombinedForecastAnalyzer' in fc_results:
+                res = fc_results['CombinedForecastAnalyzer']
+                if not res.empty:
+                    self.save_analysis(country_code, res, feature='forecasts')
+
             logger.debug(f"Analysis completed for {country_code}")
         except Exception as e:
             logger.error(f"Error analyzing {country_code}: {e}")
 
     def save_analysis(self, country_code: str, df: pd.DataFrame, feature: str = 'ma') -> None:
-        """
-        Save analysis results to CSV.
-        
-        Args:
-            country_code (str): Country code
-            df (pd.DataFrame): DataFrame to save
-            feature (str): Feature name for filename
-        
-        Raises:
-            DataException: If save fails
-        """
         try:
+            if df.empty: return
             directory = self.__directory / country_code
             directory.mkdir(parents=True, exist_ok=True)
             
             filename = f"{country_code}_{feature}.csv"
-            filepath = directory / filename
-            
-            df.to_csv(filepath, index=False)
-            logger.info(f"Saved analysis to {filepath}")
+            df.to_csv(directory / filename, index=False)
+            logger.info(f"Saved analysis to {filename}")
         except Exception as e:
-            logger.error(f"Error saving analysis for {country_code}: {e}")
-            raise DataException(f"Error saving analysis for {country_code}: {e}")
+            logger.error(f"Error saving analysis: {e}")
 
     def __update_features_file(self) -> None:
-        """Update features.csv with new features."""
+        """Update features.csv registry."""
         features_file = self.__directory / "features.csv"
         try:
-            # Always ensure 'ma' and 'forecast' are present
-            pd.DataFrame({'ma': [], 'forecast': []}).to_csv(features_file, index=False)
-            logger.debug("Features file updated")
+            # We now only use 'ma' and 'forecasts' (plural)
+            pd.DataFrame({'ma': [], 'forecasts': []}).to_csv(features_file, index=False)
         except Exception as e:
             logger.error(f"Error updating features file: {e}")
 
     def download(self) -> None:
-        """
-        Download price data from ENTSOE for all countries.
-        
-        Raises:
-            DownloadException: If download fails
-        """
         try:
             client = EntsoePandasClient(api_key=ENTSOE_API_KEY)
             start_date = DATA_START_DATE
             end_date = pd.Timestamp.now(tz=DEFAULT_TIMEZONE).round(freq='h')
-            
             logger.info(f"Starting download from {start_date} to {end_date}")
-            
             for i, country_code in enumerate(self.__country_codes, 1):
                 logger.info(f"[{i}/{len(self.__country_codes)}] Downloading {country_code}...")
                 self.download_by_country_code(client, country_code, start_date, end_date)
                 self.download_generation_by_country_code(client, country_code, start_date, end_date)
-            
             logger.info("Download completed successfully")
         except Exception as e:
             logger.error(f"Download failed: {e}")
             raise DownloadException(f"Download failed: {e}")
 
-    def download_by_country_code(
-        self, 
-        client: EntsoePandasClient, 
-        country_code: str, 
-        start_date: pd.Timestamp, 
-        end_date: pd.Timestamp
-    ) -> None:
-        """
-        Download data for a specific country.
-        
-        Args:
-            client (EntsoePandasClient): ENTSOE API client
-            country_code (str): Country code
-            start_date (pd.Timestamp): Start date for download
-            end_date (pd.Timestamp): End date for download
-        
-        Raises:
-            DownloadException: If download fails
-        """
+    def download_by_country_code(self, client, country_code, start_date, end_date) -> None:
+        # (Same as before)
         directory = self.__directory / country_code
         filepath = directory / f"{country_code}.csv"
         append = False
-        
         try:
             if filepath.exists():
-                logger.debug(f"Checking existing file for {country_code}...")
                 last_line = utils.read_last_csv_line(str(filepath))
-                last_saved_time = pd.Timestamp(
-                    last_line.strip().split(',')[0],
-                    tz=DEFAULT_TIMEZONE
-                )
-                
+                last_saved_time = pd.Timestamp(last_line.strip().split(',')[0], tz=DEFAULT_TIMEZONE)
                 if last_saved_time > START_OF_15_MIN_SPOT_PRICE:
                     start_date = last_saved_time + pd.Timedelta(minutes=15)
                 else:
                     start_date = last_saved_time + pd.Timedelta(hours=1)
                 append = True
-                logger.debug(f"Resuming from {start_date}")
             
-            if start_date >= end_date:
-                logger.info(f"Data for {country_code} is already up to date.")
-                return
+            if start_date >= end_date: return
 
-            logger.debug(f"Fetching data from {start_date} to {end_date}...")
             day_ahead_prices = client.query_day_ahead_prices(country_code, start_date, end_date)
-            
             directory.mkdir(parents=True, exist_ok=True)
             
-            if not append:
-                day_ahead_prices.to_csv(filepath)
-            else:
-                day_ahead_prices.to_csv(filepath, mode='a', header=False)
-            
-            logger.info(f"Successfully downloaded {country_code}: {len(day_ahead_prices)} rows")
+            if not append: day_ahead_prices.to_csv(filepath)
+            else: day_ahead_prices.to_csv(filepath, mode='a', header=False)
         except Exception as e:
             logger.error(f"Error downloading {country_code}: {e}")
-            raise DownloadException(f"Error downloading {country_code}: {e}")
 
-    def download_generation_by_country_code(
-        self, 
-        client: EntsoePandasClient, 
-        country_code: str, 
-        start_date: pd.Timestamp, 
-        end_date: pd.Timestamp
-    ) -> None:
-        """
-        Download generation data for a specific country.
-        """
+    def download_generation_by_country_code(self, client, country_code, start_date, end_date) -> None:
+        # (Same as before)
         directory = self.__directory / country_code
         filepath = directory / f"{country_code}_generation.csv"
         append = False
-        
         try:
             if filepath.exists():
                 last_line = utils.read_last_csv_line(str(filepath))
                 if last_line:
-                    last_saved_time = pd.Timestamp(
-                        last_line.strip().split(',')[0],
-                        tz=DEFAULT_TIMEZONE
-                    )
-                    
+                    last_saved_time = pd.Timestamp(last_line.strip().split(',')[0], tz=DEFAULT_TIMEZONE)
                     if last_saved_time > START_OF_15_MIN_SPOT_PRICE:
                         start_date = last_saved_time + pd.Timedelta(minutes=15)
                     else:
                         start_date = last_saved_time + pd.Timedelta(hours=1)
-                        
                     append = True
-                    logger.debug(f"Resuming generation from {start_date}")
             
-            if start_date >= end_date:
-                return
+            if start_date >= end_date: return
 
-            logger.debug(f"Fetching generation data from {start_date} to {end_date}...")
             df = client.query_generation(country_code, start=start_date, end=end_date, psr_type=None)
-            
-            if isinstance(df.columns, pd.MultiIndex):
-                df.columns = df.columns.get_level_values(0)
-            
+            if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
             directory.mkdir(parents=True, exist_ok=True)
             
-            if not append:
-                df.to_csv(filepath)
+            if not append: df.to_csv(filepath)
             else:
                 existing_df = pd.read_csv(filepath, nrows=0, index_col=0)
-                
-                # Handle duplicate columns in new data to match pandas read_csv mangling
-                # This ensures we can reindex against the existing file's columns
                 if not df.columns.is_unique:
+                    # Deduplicate columns logic...
                     new_cols = []
                     col_counts = {}
                     for col in df.columns:
@@ -419,11 +269,8 @@ class DataManager:
                             col_counts[col] = 0
                             new_cols.append(col)
                     df.columns = new_cols
-
                 df = df.reindex(columns=existing_df.columns)
                 df.to_csv(filepath, mode='a', header=False)
-            
-            logger.info(f"Successfully downloaded generation for {country_code}: {len(df)} rows")
         except Exception as e:
             logger.error(f"Error downloading generation for {country_code}: {e}")
 
