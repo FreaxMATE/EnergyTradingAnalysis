@@ -4,9 +4,11 @@ from abc import ABC, abstractmethod
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
 
 # Machine Learning Imports
+ML_AVAILABLE = False
 try:
     from sklearn.ensemble import HistGradientBoostingRegressor, RandomForestRegressor
     from sklearn.multioutput import MultiOutputRegressor
+    ML_AVAILABLE = True
 except ImportError:
     import sys
     print("Warning: scikit-learn not installed. ML analysis will fail.", file=sys.stderr)
@@ -116,6 +118,10 @@ class CombinedForecastAnalyzer(Analyzer):
 
     def _run_ml_model(self, df, model_type='gb'):
         """Helper to run ML models (GB or RF)."""
+        if not ML_AVAILABLE:
+            logger.warning(f"ML {model_type} not available: scikit-learn not installed")
+            return pd.DataFrame()
+            
         try:
             prices = df['price'].values
             times = df.index
