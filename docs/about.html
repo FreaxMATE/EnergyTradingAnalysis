@@ -112,21 +112,45 @@ flowchart LR
   </details>
 
   <h2>4. Feature engineering</h2>
-  <p>Before any model sees data, we build a feature table that combines:</p>
-  <ul>
-    <li><strong>Lagged prices</strong> — the previous 24 hours (captures the short-term trend) and the same 24 hours from last week (captures the day-of-week pattern).</li>
-    <li><strong>Calendar features</strong> — hour-of-day and day-of-week as sine/cosine pairs so the model sees them as cyclical, plus weekend, holiday, day-before-holiday and day-after-holiday flags (powered by <code>python-holidays</code>; zones like DE_LU union the German and Luxembourgish calendars).</li>
-    <li><strong>Exogenous regressors</strong> — TSO load + wind + solar forecasts at the target timestamp. These are by far the biggest accuracy driver: adding them dropped LightGBM MAE on DE_LU from 33 €/MWh to 19 €/MWh.</li>
-  </ul>
+  <p>Before any model sees data, we build a feature table from three groups, listed here in the exact order they appear in the matrix:</p>
+
+  <table>
+    <thead><tr><th>Group</th><th>Features</th><th>Count (15-min)</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Lagged prices</strong></td>
+        <td>Previous 24&nbsp;h of cleared prices (<code>lag_day_0…lag_day_95</code>) plus the same 24&nbsp;h from one week earlier (<code>lag_week_0…lag_week_95</code>). Captures intraday momentum and the weekly day-of-week pattern.</td>
+        <td>96 + 96 = 192</td>
+      </tr>
+      <tr>
+        <td><strong>Horizon step</strong></td>
+        <td><code>horizon_step</code> ∈ {0, 1, …, 95}. LightGBM only — lets a single fitted model produce all 96 future values.</td>
+        <td>1</td>
+      </tr>
+      <tr>
+        <td><strong>Calendar</strong></td>
+        <td><code>hour_sin</code>, <code>hour_cos</code>, <code>dow_sin</code>, <code>dow_cos</code> (cyclical encodings), <code>is_weekend</code>, <code>is_holiday</code>, <code>is_day_before_holiday</code>, <code>is_day_after_holiday</code>. Holiday flags come from <code>python-holidays</code>; multi-country zones like DE_LU union the German and Luxembourgish calendars.</td>
+        <td>8</td>
+      </tr>
+      <tr>
+        <td><strong>Exogenous (TSO forecasts)</strong></td>
+        <td><code>load_forecast</code>, <code>solar_forecast</code>, <code>wind_onshore_forecast</code>, <code>wind_offshore_forecast</code>. The full subset depends on what each TSO publishes — some zones omit offshore wind.</td>
+        <td>up to 4</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>Total: ~205 features per row at 15-min resolution. The exogenous regressors are by far the biggest accuracy driver — adding them dropped LightGBM MAE on DE_LU from 33 €/MWh to 19 €/MWh.</p>
 
   <details>
     <summary><span class="pill">For developers</span> &nbsp; long-format vs wide-format matrices</summary>
-    <p>Two layouts are produced from the same raw features:</p>
+    <p>Two layouts are produced from the same raw features in <code>src/features.py</code>:</p>
     <ul>
-      <li><strong>Wide</strong>: one row per forecast origin, target shape <code>(n, horizon)</code>. Used by Random Forest as a true multi-output regressor.</li>
-      <li><strong>Long</strong>: one row per (origin, horizon-step) pair, target shape <code>(n × horizon,)</code>, with the horizon step itself stored as a feature. Used by LightGBM — a single fit learns all 96 forecast steps at once. This replaces the previous <code>MultiOutputRegressor</code>-around-HGB which trained 96 separate boosters per fit (≈10× slower).</li>
+      <li><strong>Wide</strong> (<code>build_wide_matrix</code>): one row per forecast origin <em>t</em>, target shape <code>(n, horizon)</code>. Calendar + exogenous features are evaluated <em>at the origin only</em>. Used by Random Forest as a multi-output regressor. The <code>horizon_step</code> feature is absent — the horizon is in the target dimension instead.</li>
+      <li><strong>Long</strong> (<code>build_long_matrix</code>): one row per (origin, horizon-step) pair, target shape <code>(n × horizon,)</code>. Calendar + exogenous features are evaluated <em>at the target timestamp t+h</em>, and <code>horizon_step</code> is appended. Used by LightGBM — a single fit learns all 96 forecast steps. This replaces the previous <code>MultiOutputRegressor</code>-around-HGB which trained 96 separate boosters per fit (≈10× slower).</li>
     </ul>
-    <p>For each origin <em>t</em> and horizon offset <em>h</em>, the long-format row carries the lags ending at <em>t</em> but the calendar + exogenous features for the target timestamp <em>t+h</em>. The target itself is the price at <em>t+h</em>. See <code>src/features.py</code>.</p>
+    <p>The accuracy implication: <strong>Random Forest cannot see how wind/solar/load forecasts evolve across the 24-hour horizon</strong> — it only knows their values at <em>t</em>. LightGBM sees the per-step forecasted values directly. This is a contributing factor to LightGBM's edge over RF on this problem.</p>
+    <p>Lag windows: <code>lag_day</code> is exactly <code>steps_per_day</code> samples (24 for hourly, 96 for 15-min). <code>lag_week</code> is the same <code>steps_per_day</code> window starting from 7 × <code>steps_per_day</code> samples ago — i.e., the same wall-clock 24 hours, one week earlier.</p>
   </details>
 
   <h2>5. The models</h2>
