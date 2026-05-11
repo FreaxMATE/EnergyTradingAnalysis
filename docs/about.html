@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How it works — Energy Trading Analysis</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', flowchart: { curve: 'basis' } });</script>
+<style>
+  :root {
+    --ink: #1a1a1a;
+    --muted: #6c757d;
+    --line: #e1e4e8;
+    --bg: #fafbfc;
+    --card: #ffffff;
+    --accent: #0d6efd;
+    --accent-soft: #e7f1ff;
+    --code-bg: #f6f8fa;
+  }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.55;
+  }
+  .container { max-width: 880px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+  h1 { font-size: 1.8rem; margin: 0 0 0.25rem; }
+  h2 { font-size: 1.25rem; margin: 2.25rem 0 0.5rem; border-bottom: 1px solid var(--line); padding-bottom: 0.35rem; }
+  h3 { font-size: 1.02rem; margin: 1.25rem 0 0.4rem; }
+  p, li { font-size: 0.95rem; }
+  .subtitle { color: var(--muted); margin-top: 0; }
+  .hero { width: 100%; border: 1px solid var(--line); border-radius: 8px; margin: 1rem 0 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 1rem 1.1rem; margin: 0.6rem 0 0.9rem; }
+  .pill { display: inline-block; padding: 0.1rem 0.55rem; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 0.78rem; font-weight: 600; letter-spacing: 0.02em; }
+  code, pre { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 0.85rem; }
+  pre { background: var(--code-bg); border-radius: 6px; padding: 0.75rem 0.9rem; overflow-x: auto; border: 1px solid var(--line); }
+  code { background: var(--code-bg); padding: 0.05rem 0.3rem; border-radius: 4px; }
+  pre code { background: transparent; padding: 0; }
+  details { margin: 0.6rem 0 1.1rem; border: 1px solid var(--line); border-radius: 8px; padding: 0 1rem; background: var(--card); }
+  details[open] { padding-bottom: 0.6rem; }
+  details summary { cursor: pointer; padding: 0.7rem 0; font-weight: 600; color: var(--accent); list-style: none; display: flex; align-items: center; gap: 0.4rem; }
+  details summary::before { content: "▸"; transition: transform 0.15s; }
+  details[open] summary::before { transform: rotate(90deg); }
+  .mermaid { background: white; border: 1px solid var(--line); border-radius: 8px; padding: 1rem; text-align: center; }
+  table { width: 100%; border-collapse: collapse; margin: 0.5rem 0 1rem; font-size: 0.9rem; }
+  th, td { text-align: left; padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--line); }
+  th { background: var(--code-bg); font-weight: 600; }
+  .legend { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.5rem 0; }
+  .legend span { font-size: 0.82rem; padding: 0.18rem 0.55rem; border-radius: 4px; background: var(--accent-soft); color: var(--ink); border: 1px solid var(--line); }
+  .swatch { display: inline-block; width: 0.7rem; height: 0.7rem; border-radius: 2px; margin-right: 0.3rem; vertical-align: middle; }
+  footer { color: var(--muted); font-size: 0.85rem; margin-top: 3rem; text-align: center; }
+  .wf-svg { width: 100%; max-width: 760px; height: auto; display: block; margin: 0.5rem auto; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <h1>How this dashboard is built</h1>
+  <p class="subtitle">End-to-end walkthrough of the data pipeline, forecast models, and accuracy evaluation.</p>
+
+  <img src="screenshot.png" alt="Dashboard overview" class="hero">
+
+  <h2>1. What you're looking at</h2>
+  <p>Each bidding zone (DE_LU, DK_2, SE_4, …) gets its own report with four sections:</p>
+  <ul>
+    <li><strong>Short-term view</strong> — the last 3 days of cleared day-ahead prices plus a 24-hour forecast from four different models, with shaded 80% prediction intervals.</li>
+    <li><strong>Generation mix</strong> — stacked actual generation by fuel type for the last 90 days.</li>
+    <li><strong>Long-term history</strong> — full price history plus a 24-hour moving average.</li>
+    <li><strong>Backtest</strong> — how each forecast model performed against actual prices over the last 30 days, with a metrics table and a per-model MAE bar chart.</li>
+  </ul>
+
+  <h2>2. Pipeline at a glance</h2>
+  <p>A single GitHub Actions cron runs once a day. It downloads new data from ENTSO-E, retrains the models, runs the backtest, and rebuilds the static HTML reports.</p>
+
+  <div class="mermaid">
+flowchart LR
+  A[ENTSO-E<br/>Transparency Platform] --> B[main.py download]
+  B --> C[(data/&lt;zone&gt;/<br/>prices · generation<br/>load_fc · ren_fc)]
+  C --> D[features.py]
+  D --> E[analysis.py<br/>live forecast]
+  D --> F[backtest.py<br/>walk-forward]
+  E --> G[(forecasts.csv)]
+  F --> H[(backtest.csv<br/>metrics.csv)]
+  G --> I[plot_bokeh.py]
+  H --> I
+  I --> J[docs/report_&lt;zone&gt;.html]
+  classDef src fill:#fff8e1,stroke:#f0c040;
+  classDef code fill:#e7f1ff,stroke:#0d6efd;
+  classDef out fill:#e8f5e9,stroke:#43a047;
+  class A src;
+  class B,D,E,F,I code;
+  class C,G,H,J out;
+  </div>
+
+  <h2>3. Data inputs</h2>
+  <p>All raw data comes from <a href="https://transparency.entsoe.eu/" target="_blank">ENTSO-E's Transparency Platform</a>, the official source for European electricity market data.</p>
+  <table>
+    <thead><tr><th>What</th><th>Why we use it</th><th>Resolution</th></tr></thead>
+    <tbody>
+      <tr><td>Day-ahead spot prices</td><td>This is the target — what we're trying to forecast.</td><td>Hourly &lt; Oct 2025 → 15-min after</td></tr>
+      <tr><td>Actual generation by fuel</td><td>Displayed in the generation-mix chart; not used in forecasts (it's only published after the fact).</td><td>15-min / hourly</td></tr>
+      <tr><td>TSO load forecast</td><td>Demand drives price. Published the day before delivery, so it's available when forecasting.</td><td>15-min</td></tr>
+      <tr><td>TSO wind &amp; solar forecast</td><td>Renewable supply cuts price. Published with the load forecast.</td><td>15-min</td></tr>
+    </tbody>
+  </table>
+
+  <details>
+    <summary><span class="pill">For developers</span> &nbsp; data layout &amp; resume logic</summary>
+    <p>Each zone gets a folder under <code>data/&lt;zone&gt;/</code> with one CSV per data type. The downloader reads the last line of each existing CSV and asks ENTSO-E only for what's missing, then appends. Spot &amp; generation queries end at "now"; forecast queries end at "now + 2 days" so we capture tomorrow's published TSO forecast. The whole download is resume-safe — re-running it is cheap.</p>
+    <p>The market resolution flips on <code>2025-10-01</code> from hourly to 15-min in several zones. The pipeline auto-detects this per zone by looking at the median spacing of the last week of data, and trains at that native resolution. Mixing both via forward-fill (the old behavior) artificially inflates sample counts 4× with duplicates and biases seasonal models.</p>
+  </details>
+
+  <h2>4. Feature engineering</h2>
+  <p>Before any model sees data, we build a feature table that combines:</p>
+  <ul>
+    <li><strong>Lagged prices</strong> — the previous 24 hours (captures the short-term trend) and the same 24 hours from last week (captures the day-of-week pattern).</li>
+    <li><strong>Calendar features</strong> — hour-of-day and day-of-week as sine/cosine pairs so the model sees them as cyclical, plus weekend, holiday, day-before-holiday and day-after-holiday flags (powered by <code>python-holidays</code>; zones like DE_LU union the German and Luxembourgish calendars).</li>
+    <li><strong>Exogenous regressors</strong> — TSO load + wind + solar forecasts at the target timestamp. These are by far the biggest accuracy driver: adding them dropped LightGBM MAE on DE_LU from 33 €/MWh to 19 €/MWh.</li>
+  </ul>
+
+  <details>
+    <summary><span class="pill">For developers</span> &nbsp; long-format vs wide-format matrices</summary>
+    <p>Two layouts are produced from the same raw features:</p>
+    <ul>
+      <li><strong>Wide</strong>: one row per forecast origin, target shape <code>(n, horizon)</code>. Used by Random Forest as a true multi-output regressor.</li>
+      <li><strong>Long</strong>: one row per (origin, horizon-step) pair, target shape <code>(n × horizon,)</code>, with the horizon step itself stored as a feature. Used by LightGBM — a single fit learns all 96 forecast steps at once. This replaces the previous <code>MultiOutputRegressor</code>-around-HGB which trained 96 separate boosters per fit (≈10× slower).</li>
+    </ul>
+    <p>For each origin <em>t</em> and horizon offset <em>h</em>, the long-format row carries the lags ending at <em>t</em> but the calendar + exogenous features for the target timestamp <em>t+h</em>. The target itself is the price at <em>t+h</em>. See <code>src/features.py</code>.</p>
+  </details>
+
+  <h2>5. The models</h2>
+  <p>Four forecasts are produced for every zone, all at the zone's native market resolution and over a 24-hour horizon:</p>
+
+  <div class="legend">
+    <span><span class="swatch" style="background:#c0392b"></span>Seasonal Naive</span>
+    <span><span class="swatch" style="background:#7f8c8d"></span>Holt-Winters</span>
+    <span><span class="swatch" style="background:#27ae60"></span>LightGBM</span>
+    <span><span class="swatch" style="background:#2980b9"></span>Random Forest</span>
+  </div>
+
+  <div class="card">
+    <h3>Seasonal Naive (baseline)</h3>
+    <p>Predicts each future point by simply copying the value from exactly 7 days ago at the same time-of-week. No learning, no parameters — just a sanity floor. Every other model is judged by how much it beats this one (the <strong>MASE</strong> metric reports this ratio directly).</p>
+  </div>
+  <div class="card">
+    <h3>Holt-Winters</h3>
+    <p>Classical triple exponential smoothing: decomposes the series into level + trend + daily seasonal pattern and projects them forward. Fast, no exogenous inputs. Gets the daily shape roughly right but doesn't react to load/wind anomalies.</p>
+  </div>
+  <div class="card">
+    <h3>LightGBM (the main forecaster)</h3>
+    <p>Gradient-boosted decision trees on the full feature stack — lags + calendar + holidays + exogenous forecasts. Three separate fits at quantile levels 0.1 / 0.5 / 0.9 give a point forecast (the median) plus an 80% prediction interval. On DE_LU it beats seasonal-naive by roughly 3× (MASE ≈ 0.67).</p>
+  </div>
+  <div class="card">
+    <h3>Random Forest</h3>
+    <p>A bagged-tree multi-output regressor on the same features. Generally not as accurate as LightGBM on this problem, but uncorrelated errors mean it's useful as an ensemble member and as a sanity check.</p>
+  </div>
+
+  <details>
+    <summary><span class="pill">For developers</span> &nbsp; model implementation details</summary>
+    <p><strong>LightGBM quantile</strong>: three <code>lgb.LGBMRegressor(objective="quantile", alpha=q)</code> models for q ∈ {0.1, 0.5, 0.9}, each trained on the long-format matrix. The prediction intervals are then monotonized (lo ≤ median ≤ hi) to avoid quantile crossing.</p>
+    <p><strong>Holt-Winters intervals</strong> come from <em>split conformal prediction</em>: hold out the last <code>horizon</code> observations, fit on the rest, compute the absolute residuals on the holdout, and use the α-quantile of those residuals as the half-width of the interval. Distribution-free — no assumption that residuals are Gaussian.</p>
+    <p>All hyperparameters live in <code>analysis.DEFAULT_PARAMS</code> and can be overridden by writing <code>data/best_params.json</code> from the offline tuner.</p>
+  </details>
+
+  <h2>6. Measuring accuracy: walk-forward backtest</h2>
+  <p>Forecasts are only useful if you know how wrong they tend to be. Every analyze run also performs a 30-day walk-forward backtest:</p>
+  <ol>
+    <li>Pick a day <em>d</em>.</li>
+    <li>Train every model using data available <em>before</em> <em>d</em> at midnight UTC.</li>
+    <li>Predict the next 24 hours.</li>
+    <li>Compare to actuals once they're in.</li>
+    <li>Slide one day forward and repeat.</li>
+  </ol>
+
+  <svg viewBox="0 0 760 220" class="wf-svg" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="arr" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+        <path d="M0,0 L6,3 L0,6 z" fill="#0d6efd"/>
+      </marker>
+    </defs>
+    <line x1="20" y1="180" x2="740" y2="180" stroke="#888" stroke-width="1"/>
+    <text x="20" y="200" font-size="11" fill="#666">past</text>
+    <text x="700" y="200" font-size="11" fill="#666">now</text>
+    <!-- Fold 1 -->
+    <rect x="30" y="40" width="320" height="20" fill="#e7f1ff" stroke="#0d6efd"/>
+    <rect x="350" y="40" width="50" height="20" fill="#fef3c7" stroke="#f59e0b"/>
+    <text x="30" y="32" font-size="11" fill="#0d6efd">train (60 d)</text>
+    <text x="356" y="32" font-size="11" fill="#b45309">predict 24h</text>
+    <text x="410" y="55" font-size="11" fill="#666">fold 1</text>
+    <!-- Fold 2 -->
+    <rect x="50" y="80" width="320" height="20" fill="#e7f1ff" stroke="#0d6efd"/>
+    <rect x="370" y="80" width="50" height="20" fill="#fef3c7" stroke="#f59e0b"/>
+    <text x="430" y="95" font-size="11" fill="#666">fold 2</text>
+    <!-- Fold 3 -->
+    <rect x="70" y="120" width="320" height="20" fill="#e7f1ff" stroke="#0d6efd"/>
+    <rect x="390" y="120" width="50" height="20" fill="#fef3c7" stroke="#f59e0b"/>
+    <text x="450" y="135" font-size="11" fill="#666">fold 3, …, fold 30</text>
+    <!-- arrow -->
+    <line x1="380" y1="160" x2="420" y2="160" stroke="#0d6efd" stroke-width="1.5" marker-end="url(#arr)"/>
+    <text x="420" y="156" font-size="11" fill="#0d6efd">+1 day per fold</text>
+  </svg>
+
+  <p>That gives us 30 × 24 = 720 hourly predictions per model (or 30 × 96 = 2880 at 15-min resolution), all of them strictly out-of-sample. Five accuracy metrics are computed per model:</p>
+
+  <table>
+    <thead><tr><th>Metric</th><th>What it tells you</th></tr></thead>
+    <tbody>
+      <tr><td><strong>MAE</strong> (Mean Absolute Error)</td><td>Average miss in €/MWh. Easiest to interpret — directly comparable to spot prices.</td></tr>
+      <tr><td><strong>RMSE</strong></td><td>Penalizes big misses extra. If RMSE ≫ MAE, the model has occasional large errors.</td></tr>
+      <tr><td><strong>sMAPE</strong></td><td>Percentage error, symmetric so it doesn't explode near zero (electricity prices regularly cross zero — plain MAPE is unusable here).</td></tr>
+      <tr><td><strong>Bias</strong></td><td>Mean signed error. Positive = over-forecast on average; negative = under-forecast. Should be close to zero.</td></tr>
+      <tr><td><strong>MASE</strong></td><td>How much better than the seasonal-naive baseline. &lt;1 = beats baseline; ≥1 = doesn't.</td></tr>
+    </tbody>
+  </table>
+
+  <details>
+    <summary><span class="pill">For developers</span> &nbsp; backtest implementation</summary>
+    <p>Daily folds, weekly ML refit. Refitting LightGBM and Random Forest at every fold would be wasteful — the feature distribution barely shifts day-to-day — so we refit them every 7 folds and reuse between. Holt-Winters and the seasonal-naive baseline are cheap so they refit every fold.</p>
+    <p>Cuts are spaced exactly one day apart at midnight UTC (<code>cut = start + k × steps_per_day</code>) so each fold corresponds to a real day-ahead bidding round. The MASE denominator uses the seasonal-naive forecast on the training data — anything &lt;1 is genuinely better than "predict yesterday".</p>
+    <p>See <code>src/backtest.py</code> and <code>src/metrics.py</code>.</p>
+  </details>
+
+  <h2>7. Reading the dashboard</h2>
+  <p>Three things to check when comparing models:</p>
+  <ol>
+    <li><strong>Backtest MAE bar chart</strong> (bottom right of each report). Whichever bar is shortest has been most accurate on the last 30 days. Seasonal Naive should always be longest; if it isn't, something's wrong.</li>
+    <li><strong>Prediction intervals</strong> in the short-term view. The shaded band around each model's line is its 80% prediction interval — there's a 4-in-5 chance the actual price will land inside it. Wider bands ≈ less confident model.</li>
+    <li><strong>Bias column</strong> in the metrics table. A model with low MAE but high bias is systematically off in one direction; useful to know if you're using forecasts in a trading strategy.</li>
+  </ol>
+
+  <h2>8. Reproducibility</h2>
+  <p>The whole pipeline is one Python entry-point and a couple of supporting scripts:</p>
+  <pre><code>python src/main.py download     # fetch new data from ENTSO-E
+python src/main.py analyze      # live forecast + backtest
+python src/main.py plot         # rebuild the dashboards
+python src/tune.py --zone DE_LU # offline hyperparameter search</code></pre>
+  <p>A GitHub Actions cron does the first three steps daily at 00:05 UTC and pushes the regenerated <code>data/</code> + <code>docs/</code> back to the repository. The site you're looking at is the static <code>docs/</code> folder served via GitHub Pages (or nginx in Docker).</p>
+
+  <h2>9. Limitations &amp; what's next</h2>
+  <ul>
+    <li>No weather forecasts beyond what's encoded in the TSO renewables forecast. Adding gridded numerical weather predictions would likely help, especially for solar.</li>
+    <li>No fuel/CO₂ price features. Gas and EUA prices move slowly but matter for the medium-term level of electricity prices.</li>
+    <li>Only point forecasts and one-shot 80% intervals — no full predictive distribution.</li>
+    <li>The backtest covers 30 days, which gives statistically noisy estimates for any individual model. Longer backtests are configurable but cost cron time.</li>
+  </ul>
+
+  <footer>
+    Source: <a href="https://github.com/FreaxMATE/EnergyTradingAnalysis" target="_blank">github.com/FreaxMATE/EnergyTradingAnalysis</a> &nbsp;·&nbsp; Data: ENTSO-E Transparency Platform
+  </footer>
+
+</div>
+</body>
+</html>
