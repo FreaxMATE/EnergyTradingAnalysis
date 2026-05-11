@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 import pandas as pd
 from bokeh.plotting import figure, output_file, save
-from bokeh.models import ColumnDataSource, HoverTool, Legend
+from bokeh.models import ColumnDataSource, HoverTool, Legend, DataTable, TableColumn, NumberFormatter, Div
 from bokeh.layouts import column, row
 from bokeh.palettes import Category20, Viridis256
 
@@ -22,6 +22,102 @@ def prepare_data(df, resample_rule=None):
     if resample_rule and 'time' in df.columns:
         df = df.set_index('time').resample(resample_rule).mean().reset_index()
     return df
+
+MODEL_STYLE = {
+    'naive': {'color': '#c0392b', 'label': 'Seasonal Naive', 'dash': 'dotdash'},
+    'hw':    {'color': '#7f8c8d', 'label': 'Holt-Winters',  'dash': 'solid'},
+    'gb':    {'color': '#27ae60', 'label': 'LightGBM',       'dash': 'dashed'},
+    'rf':    {'color': '#2980b9', 'label': 'Random Forest',  'dash': 'dotted'},
+}
+
+
+def _build_error_bar_chart(country_code: str, df_metrics: pd.DataFrame, metric: str = 'mae'):
+    """Horizontal bar chart of a single error metric across models."""
+    if df_metrics is None or df_metrics.empty or metric not in df_metrics.columns:
+        return None
+    m = df_metrics.copy()
+    if 'model' not in m.columns:
+        return None
+    m = m.sort_values(metric, ascending=True).reset_index(drop=True)
+    m['label'] = m['model'].map(lambda k: MODEL_STYLE.get(k, {}).get('label', k))
+    m['color'] = m['model'].map(lambda k: MODEL_STYLE.get(k, {}).get('color', '#888'))
+
+    src = ColumnDataSource(m)
+    p = figure(y_range=list(m['label']),
+               title=f"{country_code} - Mean {metric.upper()} by model (lower is better)",
+               x_axis_label=f"{metric.upper()} (EUR/MWh)",
+               height=max(180, 60 + 32 * len(m)),
+               sizing_mode="stretch_width",
+               tools="hover,save,reset",
+               tooltips=[("Model", "@label"), (metric.upper(), f"@{metric}{{0.00}}")])
+    p.hbar(y='label', right=metric, source=src, height=0.6, color='color',
+           line_color='black', line_alpha=0.3)
+    p.x_range.start = 0
+    p.ygrid.grid_line_color = None
+    return p
+
+
+def _build_backtest_section(country_code, df_backtest, df_metrics, tools):
+    """Return a Bokeh layout with a metrics table + actual-vs-predicted plot,
+    or None if no backtest data is available."""
+    if (df_backtest is None or df_backtest.empty) and (df_metrics is None or df_metrics.empty):
+        return None
+
+    children = [Div(text=f"<h2 style='margin:1em 0 0.3em 0;'>"
+                         f"{country_code} - Forecast Backtest (last 30 days)</h2>"
+                         f"<p style='color:#555;margin:0 0 0.6em 0;'>"
+                         f"Walk-forward: each day we re-fit on history available "
+                         f"before midnight UTC and predict the next 24 h.</p>")]
+
+    if df_metrics is not None and not df_metrics.empty:
+        bar = _build_error_bar_chart(country_code, df_metrics, metric='mae')
+
+        display = df_metrics.copy()
+        if 'model' in display.columns:
+            display['model'] = display['model'].map(
+                lambda k: MODEL_STYLE.get(k, {}).get('label', k))
+        for col in ('mae', 'rmse', 'smape', 'bias', 'mase'):
+            if col in display.columns:
+                display[col] = pd.to_numeric(display[col], errors='coerce').round(3)
+        fmt = NumberFormatter(format='0.000')
+        columns = [TableColumn(field='model', title='Model')]
+        for c, title in [('mae', 'MAE'), ('rmse', 'RMSE'), ('smape', 'sMAPE %'),
+                          ('bias', 'Bias'), ('mase', 'MASE'), ('n', 'N')]:
+            if c in display.columns:
+                columns.append(TableColumn(field=c, title=title, formatter=fmt))
+        table = DataTable(source=ColumnDataSource(display), columns=columns,
+                          height=30 + 28 * len(display), sizing_mode="stretch_width",
+                          index_position=None)
+        if bar is not None:
+            children.append(row(table, bar, sizing_mode="stretch_width"))
+        else:
+            children.append(table)
+
+    if df_backtest is not None and not df_backtest.empty:
+        bt = df_backtest.copy()
+        bt['time'] = pd.to_datetime(bt['time'])
+        p_bt = figure(title=f"{country_code} - Backtest: Actual vs Predicted",
+                      x_axis_type="datetime", height=400,
+                      sizing_mode="stretch_width", tools=tools,
+                      output_backend="webgl")
+        # Actuals from any model row (they share actuals per timestamp)
+        actual = bt.drop_duplicates(subset=['time']).sort_values('time')
+        p_bt.line(actual['time'], actual['actual'], color="#000000",
+                  line_width=2, legend_label="Actual", alpha=0.85)
+        for model_name, sub in bt.groupby('model'):
+            sub = sub.sort_values('time')
+            style = MODEL_STYLE.get(model_name, {'color': 'orange',
+                                                  'label': model_name, 'dash': 'dashed'})
+            p_bt.line(sub['time'], sub['predicted'], color=style['color'],
+                      line_dash=style['dash'], line_width=2,
+                      legend_label=style['label'], alpha=0.85)
+        p_bt.legend.click_policy = "hide"
+        p_bt.legend.location = "top_left"
+        p_bt.yaxis.axis_label = "Price (EUR/MWh)"
+        children.append(p_bt)
+
+    return column(*children, sizing_mode="stretch_width")
+
 
 def create_static_dashboard(country_code: str, dm=None):
     logger.info(f"Generating Bokeh report for {country_code}...")
@@ -45,7 +141,17 @@ def create_static_dashboard(country_code: str, dm=None):
     df_forecasts = None
     if country_code in dm.features and 'forecasts' in dm.features[country_code]:
         df_forecasts = prepare_data(dm.features[country_code]['forecasts'])
-        
+
+    df_backtest = None
+    if country_code in dm.features and 'backtest' in dm.features[country_code]:
+        df_backtest = prepare_data(dm.features[country_code]['backtest'])
+
+    df_metrics = None
+    if country_code in dm.features and 'metrics' in dm.features[country_code]:
+        m = dm.features[country_code]['metrics']
+        if m is not None and not m.empty:
+            df_metrics = m.copy()
+
     df_gen = None
     if country_code in dm.generation_data:
         df_gen = prepare_data(dm.generation_data[country_code])
@@ -76,16 +182,32 @@ def create_static_dashboard(country_code: str, dm=None):
     
     # Forecasts (Dynamic)
     if df_forecasts is not None:
-        # Style mapping
+        # 80% prediction interval bands (GB and HW)
+        if 'forecast_gb_lo' in df_forecasts.columns and 'forecast_gb_hi' in df_forecasts.columns:
+            p_zoom.varea(df_forecasts['time'],
+                         df_forecasts['forecast_gb_lo'],
+                         df_forecasts['forecast_gb_hi'],
+                         fill_color='#27ae60', fill_alpha=0.12,
+                         legend_label='GB 80% interval')
+        if 'forecast_hw_lo' in df_forecasts.columns and 'forecast_hw_hi' in df_forecasts.columns:
+            p_zoom.varea(df_forecasts['time'],
+                         df_forecasts['forecast_hw_lo'],
+                         df_forecasts['forecast_hw_hi'],
+                         fill_color='#95a5a6', fill_alpha=0.1,
+                         legend_label='HW 80% interval')
+
         styles = {
-            'forecast_hw': {'color': '#95a5a6', 'label': 'Holt-Winters', 'dash': 'solid', 'width': 2},
-            'forecast_gb': {'color': '#27ae60', 'label': 'Gradient Boosting', 'dash': 'dashed', 'width': 3},
-            'forecast_rf': {'color': '#2980b9', 'label': 'Random Forest', 'dash': 'dotted', 'width': 3}
+            'forecast_naive': {'color': '#c0392b', 'label': 'Seasonal Naive (baseline)', 'dash': 'dotdash', 'width': 2},
+            'forecast_hw': {'color': '#7f8c8d', 'label': 'Holt-Winters', 'dash': 'solid', 'width': 2},
+            'forecast_gb': {'color': '#27ae60', 'label': 'LightGBM (median)', 'dash': 'dashed', 'width': 3},
+            'forecast_rf': {'color': '#2980b9', 'label': 'Random Forest', 'dash': 'dotted', 'width': 3},
         }
-        
+        # Skip interval columns when drawing lines (they're shown as bands above)
+        skip = {'time', 'forecast_gb_lo', 'forecast_gb_hi', 'forecast_hw_lo', 'forecast_hw_hi'}
+
         for col in df_forecasts.columns:
-            if col == 'time': continue
-            
+            if col in skip: continue
+
             style = styles.get(col, {'color': 'orange', 'label': col, 'dash': 'dashed', 'width': 1})
             
             p_zoom.line(
@@ -143,10 +265,22 @@ def create_static_dashboard(country_code: str, dm=None):
 
     p_long.yaxis.axis_label = "Price (EUR/MWh)"
 
+    # ---------------------------------------------------------
+    # PLOT 4 + TABLE: Backtest accuracy
+    # ---------------------------------------------------------
+    backtest_section = _build_backtest_section(country_code, df_backtest, df_metrics, tools)
+
     # Layout
-    if p_gen: layout = column(row(p_zoom, p_gen, sizing_mode="stretch_width"), p_long, sizing_mode="stretch_width")
-    else: layout = column(p_zoom, p_long, sizing_mode="stretch_width")
-    
+    rows = []
+    if p_gen:
+        rows.append(row(p_zoom, p_gen, sizing_mode="stretch_width"))
+    else:
+        rows.append(p_zoom)
+    rows.append(p_long)
+    if backtest_section is not None:
+        rows.append(backtest_section)
+    layout = column(*rows, sizing_mode="stretch_width")
+
     save(layout)
     logger.info(f"Report saved to {OUTPUT_DIR / f'report_{country_code}.html'}")
 

@@ -208,3 +208,8 @@ __marimo__/
 
 .vscode/
 local_readme.md
+
+# Project artifacts
+logs/
+outfile.csv
+.Rhistory
